@@ -18,6 +18,19 @@ import { DecisionModal } from './components/DecisionModal';
 import { OmrSheetModal } from './components/OmrSheetModal';
 import { ExamNoticeModal } from './components/ExamNoticeModal';
 import { ResultReportModal } from './components/ResultReportModal';
+import { FinishExamModal } from './components/FinishExamModal';
+
+const EXAM_DURATION_SECONDS = 6 * 60;
+
+const EXAM_QUESTIONS: {
+  id: AssetCategory;
+  questionNumber: number;
+  assetName: string;
+}[] = [
+  { id: 'normal', questionNumber: 1, assetName: INITIAL_ASSETS.normal.name },
+  { id: 'leverage', questionNumber: 2, assetName: INITIAL_ASSETS.leverage.name },
+  { id: 'stable', questionNumber: 3, assetName: INITIAL_ASSETS.stable.name },
+];
 
 export default function App() {
   // Candidate & Exam Info
@@ -26,7 +39,10 @@ export default function App() {
   const [roomName] = useState<string>('제2CBT실기평가장');
 
   // Exam Progress State
-  const [timeRemaining, setTimeRemaining] = useState<number>(719); // 11m 59s
+  const [timeRemaining, setTimeRemaining] = useState<number>(EXAM_DURATION_SECONDS);
+  const [timerDeadline, setTimerDeadline] = useState<number>(
+    () => Date.now() + EXAM_DURATION_SECONDS * 1000,
+  );
   const [currentTab, setCurrentTab] = useState<AssetCategory>('normal');
   const [assets, setAssets] = useState<Record<AssetCategory, AssetData>>(INITIAL_ASSETS);
   const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
@@ -39,23 +55,32 @@ export default function App() {
   const [pendingDirection, setPendingDirection] = useState<DirectionType>('UP');
   const [isOmrOpen, setIsOmrOpen] = useState<boolean>(false);
   const [isNoticeOpen, setIsNoticeOpen] = useState<boolean>(false);
+  const [isFinishConfirmOpen, setIsFinishConfirmOpen] = useState<boolean>(false);
   const [isResultOpen, setIsResultOpen] = useState<boolean>(false);
 
-  // Countdown Timer (1 second interval)
+  // One deadline-based six-minute countdown for all three asset questions.
+  // Deriving the display from a deadline keeps the timer accurate after a
+  // background tab has throttled the interval.
   useEffect(() => {
-    if (timeRemaining <= 0 || isResultOpen) return;
-    const timer = setInterval(() => {
-      setTimeRemaining((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setIsResultOpen(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    if (isResultOpen) return;
+
+    const updateTimer = () => {
+      const nextRemaining = Math.max(0, Math.ceil((timerDeadline - Date.now()) / 1000));
+      setTimeRemaining(nextRemaining);
+
+      if (nextRemaining === 0) {
+        setIsDecisionModalOpen(false);
+        setIsOmrOpen(false);
+        setIsNoticeOpen(false);
+        setIsFinishConfirmOpen(false);
+        setIsResultOpen(true);
+      }
+    };
+
+    updateTimer();
+    const timer = window.setInterval(updateTimer, 250);
     return () => clearInterval(timer);
-  }, [timeRemaining, isResultOpen]);
+  }, [timerDeadline, isResultOpen]);
 
   // 60x Market Simulation Ticker (Ticks every 800ms)
   const advanceMarketTick = useCallback(() => {
@@ -188,6 +213,19 @@ export default function App() {
     }
   };
 
+  const handleRequestFinish = () => {
+    if (isResultOpen) return;
+    setIsFinishConfirmOpen(true);
+  };
+
+  const handleConfirmFinish = () => {
+    setIsDecisionModalOpen(false);
+    setIsOmrOpen(false);
+    setIsNoticeOpen(false);
+    setIsFinishConfirmOpen(false);
+    setIsResultOpen(true);
+  };
+
   // Global Key Handler for standard modal escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -198,6 +236,7 @@ export default function App() {
         setIsDecisionModalOpen(false);
         setIsOmrOpen(false);
         setIsNoticeOpen(false);
+        setIsFinishConfirmOpen(false);
       }
     };
 
@@ -208,6 +247,11 @@ export default function App() {
   const currentAsset = assets[currentTab];
   const currentDecision = decisions.find((d) => d.assetId === currentTab);
   const qNum = currentTab === 'normal' ? 1 : currentTab === 'leverage' ? 2 : 3;
+  const answeredAssetIds = new Set(decisions.map((decision) => decision.assetId));
+  const answeredCount = EXAM_QUESTIONS.filter((question) => answeredAssetIds.has(question.id)).length;
+  const unansweredQuestions = EXAM_QUESTIONS.filter(
+    (question) => !answeredAssetIds.has(question.id),
+  );
 
   return (
     <div
@@ -221,11 +265,11 @@ export default function App() {
         candidateNumber={candidateNumber}
         terminalNumber={terminalNumber}
         roomName={roomName}
-        answeredCount={decisions.length}
-        totalQuestions={3}
+        answeredCount={answeredCount}
+        totalQuestions={EXAM_QUESTIONS.length}
         onOpenNotice={() => setIsNoticeOpen(true)}
         onOpenOmr={() => setIsOmrOpen(true)}
-        onFinishExam={() => setIsResultOpen(true)}
+        onFinishExam={handleRequestFinish}
         isLargeFont={isLargeFont}
         onToggleFontSize={() => setIsLargeFont(!isLargeFont)}
       />
@@ -290,7 +334,7 @@ export default function App() {
         onClose={() => setIsOmrOpen(false)}
         decisions={decisions}
         onSelectQuestion={(cat) => setCurrentTab(cat)}
-        onFinishExam={() => setIsResultOpen(true)}
+        onFinishExam={handleRequestFinish}
       />
 
       {/* 5. Exam Notice Modal */}
@@ -299,7 +343,17 @@ export default function App() {
         onClose={() => setIsNoticeOpen(false)}
       />
 
-      {/* 6. Final CBT Scorecard & Pass Certificate Modal */}
+      {/* 6. Manual Finish Confirmation (timer expiry bypasses this dialog) */}
+      <FinishExamModal
+        isOpen={isFinishConfirmOpen}
+        answeredCount={answeredCount}
+        totalQuestions={EXAM_QUESTIONS.length}
+        unansweredQuestions={unansweredQuestions}
+        onCancel={() => setIsFinishConfirmOpen(false)}
+        onConfirm={handleConfirmFinish}
+      />
+
+      {/* 7. Final CBT Scorecard & Pass Certificate Modal */}
       <ResultReportModal
         isOpen={isResultOpen}
         decisions={decisions}
@@ -308,7 +362,14 @@ export default function App() {
         terminalNumber={terminalNumber}
         onRetake={() => {
           setDecisions([]);
-          setTimeRemaining(719);
+          setTimeRemaining(EXAM_DURATION_SECONDS);
+          setTimerDeadline(Date.now() + EXAM_DURATION_SECONDS * 1000);
+          setTickCount(1);
+          setIsSimulating(true);
+          setIsDecisionModalOpen(false);
+          setIsOmrOpen(false);
+          setIsNoticeOpen(false);
+          setIsFinishConfirmOpen(false);
           setIsResultOpen(false);
           setCurrentTab('normal');
           setAssets(INITIAL_ASSETS);

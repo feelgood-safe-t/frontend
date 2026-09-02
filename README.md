@@ -1,20 +1,27 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# SAFE:T Frontend
 
-# Run and deploy your AI Studio app
+금융시장 정보를 확인하고 **상승/하락 판단과 근거를 기록하는 위험 대응 시뮬레이션** 프론트엔드입니다.
 
-This contains everything you need to run your app locally.
+## 주요 기능
 
-View your app in AI Studio: https://ai.studio/apps/7b768284-8d80-4f9c-b2c9-69867b5021e1
+- 투자 성향 온보딩 설문 10문항
+- 3개 자산 시나리오 자유 이동
+- 상승/하락 선택 및 판단 근거 입력
+- 전체 6분 제한 시간과 자동 종료
+- OMR 답안 확인 및 평가 결과 제공
 
-## Run Locally
+현재는 목업 데이터와 브라우저 상태를 사용하며, 백엔드 API 연동은 추후 진행할 예정입니다.
 
-**Prerequisites:**  Node.js
+## 실행 방법
 
+```bash
+npm install
+npm run dev
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 확인 명령어
+
+```bash
+npm run lint
+npm run build
+```

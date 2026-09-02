@@ -55,13 +55,30 @@ export const ExamNoticeModal: React.FC<ExamNoticeModalProps> = ({ isOpen, onClos
               3. 답안 입력 및 근거 선택
             </h3>
             <p className="text-gray-700">
-              각 문항에서 차트, 수급 지표, 공시를 확인한 후 [▲ 상승] 또는 [▼ 하락]을 선택하고, 판단 확신도 및 1개 이상의 판단 근거를 선택하여 제출하십시오.
+              각 문항에서 차트, 수급 지표, 공시를 확인한 후 [▲ 상승] 또는 [▼ 하락]을 선택하고,
+              판단 확신도를 설정한 뒤 근거 태그를 선택하거나 판단 근거를 직접 입력하여 제출하십시오.
             </p>
           </div>
 
           <div>
             <h3 className="font-bold text-sm text-black mb-1">
-              4. 합격 기준
+              4. 제한 시간 및 시험 종료
+            </h3>
+            <div className="bg-[#FFF9E6] border border-black p-2.5 text-gray-800">
+              <p>
+                전체 제한 시간은 <strong>6분</strong>이며, 제한 시간 동안 3개 자산 화면을 자유롭게
+                이동할 수 있습니다.
+              </p>
+              <p className="mt-1 text-[11px]">
+                ※ 각 문항에서 최소 한 번 이상 의사결정을 제출해야 합니다. 미응답 문항은 0점
+                처리되며, 제한 시간이 끝나면 답안이 자동 제출됩니다.
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="font-bold text-sm text-black mb-1">
+              5. 합격 기준
             </h3>
             <div className="bg-[#E6EEF8] border border-black p-2.5">
               <div className="font-bold text-[#004080]">

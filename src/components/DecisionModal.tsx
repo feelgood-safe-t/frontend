@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AssetData, ConfidenceLevel, DirectionType, ReasonCategory } from '../types';
 
 interface DecisionModalProps {
@@ -22,18 +22,34 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({
   onSubmit,
 }) => {
   const [confidence, setConfidence] = useState<ConfidenceLevel>('MEDIUM');
-  const [reasons, setReasons] = useState<ReasonCategory[]>(['PRICE', 'SUPPLY_DEMAND']);
+  const [reasons, setReasons] = useState<ReasonCategory[]>([]);
   const [memo, setMemo] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submitProgress, setSubmitProgress] = useState<number>(0);
   const [validationError, setValidationError] = useState<string>('');
+  const submitIntervalRef = useRef<number | null>(null);
+  const submitTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (isOpen) {
+      setConfidence('MEDIUM');
+      setReasons([]);
+      setMemo('');
       setIsSubmitting(false);
       setSubmitProgress(0);
       setValidationError('');
     }
+
+    return () => {
+      if (submitIntervalRef.current !== null) {
+        window.clearInterval(submitIntervalRef.current);
+        submitIntervalRef.current = null;
+      }
+      if (submitTimeoutRef.current !== null) {
+        window.clearTimeout(submitTimeoutRef.current);
+        submitTimeoutRef.current = null;
+      }
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -43,12 +59,17 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({
       setReasons(reasons.filter((item) => item !== r));
     } else {
       setReasons([...reasons, r]);
+      setValidationError('');
     }
   };
 
   const handleFinalSubmit = () => {
-    if (reasons.length === 0) {
-      setValidationError('※ 판단 근거를 최소 1개 이상 반드시 선택하여야 합니다.');
+    if (isSubmitting) return;
+
+    const trimmedMemo = memo.trim();
+
+    if (reasons.length === 0 && trimmedMemo.length === 0) {
+      setValidationError('※ 판단 근거를 선택하거나 직접 입력해 주세요.');
       return;
     }
 
@@ -57,17 +78,21 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({
 
     // Visualize standard server transmission progress
     let p = 15;
-    const interval = setInterval(() => {
+    submitIntervalRef.current = window.setInterval(() => {
       p += 35;
       if (p >= 100) {
-        clearInterval(interval);
+        if (submitIntervalRef.current !== null) {
+          window.clearInterval(submitIntervalRef.current);
+          submitIntervalRef.current = null;
+        }
         setSubmitProgress(100);
-        setTimeout(() => {
+        submitTimeoutRef.current = window.setTimeout(() => {
+          submitTimeoutRef.current = null;
           onSubmit({
             direction,
             confidence,
             reasons,
-            memo,
+            memo: trimmedMemo,
           });
           onClose();
         }, 250);
@@ -153,14 +178,18 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({
           <div className="border border-black p-2.5 bg-[#FAFAFA]">
             <div className="font-bold text-gray-900 mb-1 flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <span className="bg-[#004080] text-white px-1.5 py-0.2 text-[10px] whitespace-nowrap">필수</span>
-                <span className="whitespace-nowrap">2. 판단 근거 (복수 선택 가능)</span>
+                <span className="bg-[#004080] text-white px-1.5 py-0.2 text-[10px] whitespace-nowrap">택1 필수</span>
+                <span className="whitespace-nowrap">2. 판단 근거 태그 (복수 선택 가능)</span>
               </div>
               <span className="text-[10px] text-gray-500 whitespace-nowrap">선택 {reasons.length}개</span>
             </div>
 
             {validationError && (
-              <div className="bg-[#FFEAEA] text-[#D90000] border border-[#D90000] p-1 mb-2 text-[11px] font-bold">
+              <div
+                id="decision-reason-error"
+                role="alert"
+                className="bg-[#FFEAEA] text-[#D90000] border border-[#D90000] p-1 mb-2 text-[11px] font-bold"
+              >
                 {validationError}
               </div>
             )}
@@ -195,20 +224,27 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({
             </div>
           </div>
 
-          {/* 3. Optional Memo */}
+          {/* 3. Direct Reason Input */}
           <div className="border border-black p-2.5 bg-[#FAFAFA]">
             <div className="font-bold text-gray-900 mb-1 flex items-center gap-1.5">
-              <span className="bg-gray-500 text-white px-1.5 py-0.2 text-[10px]">선택</span>
-              <span>3. 메모</span>
+              <span className="bg-[#004080] text-white px-1.5 py-0.2 text-[10px]">택1 필수</span>
+              <span>3. 판단 근거 직접 입력</span>
             </div>
             <input
               type="text"
               value={memo}
-              onChange={(e) => setMemo(e.target.value)}
+              onChange={(e) => {
+                setMemo(e.target.value);
+                if (e.target.value.trim().length > 0) setValidationError('');
+              }}
               placeholder="예: 외국인 순매수 지속 및 실적 호조"
               className="w-full border border-black p-1.5 text-xs bg-white focus:outline-none"
               maxLength={60}
+              aria-describedby={validationError ? 'decision-reason-error' : undefined}
             />
+            <p className="mt-1 text-[10px] text-gray-500">
+              근거 태그 또는 직접 입력 중 한 가지 이상을 작성해야 합니다.
+            </p>
           </div>
 
           {/* Submission in progress indicator */}

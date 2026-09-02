@@ -18,6 +18,9 @@ export const OmrSheetModal: React.FC<OmrSheetModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
+  const answeredAssetIds = new Set(decisions.map((decision) => decision.assetId));
+  const answeredCount = answeredAssetIds.size;
+
   const questions: { id: AssetCategory; qNum: number; name: string; type: string }[] = [
     { id: 'normal', qNum: 1, name: '한국종합 인덱스 코어 200', type: '일반 자산' },
     { id: 'leverage', qNum: 2, name: 'K-2X 볼라틸리티 울트라 레버리지', type: '레버리지 자산' },
@@ -59,7 +62,7 @@ export const OmrSheetModal: React.FC<OmrSheetModalProps> = ({
           <div className="bg-white border border-black p-3 flex justify-between items-center">
             <div>
               <div className="font-bold text-sm text-black">
-                마킹 완료: <span className="text-[#004080] font-black">{decisions.length}</span> / 3문항
+                마킹 완료: <span className="text-[#004080] font-black">{answeredCount}</span> / 3문항
               </div>
               <div className="text-gray-600 text-[11px] mt-0.5">
                 모든 문항을 확인한 후 최종 제출을 진행하십시오.
@@ -67,9 +70,9 @@ export const OmrSheetModal: React.FC<OmrSheetModalProps> = ({
             </div>
             <div className="text-right font-mono">
               <span className={`px-2 py-1 border font-bold ${
-                decisions.length === 3 ? 'bg-[#EBF3FF] text-[#004080] border-[#004080]' : 'bg-[#FFF0F0] text-[#D90000] border-[#D90000]'
+                answeredCount === 3 ? 'bg-[#EBF3FF] text-[#004080] border-[#004080]' : 'bg-[#FFF0F0] text-[#D90000] border-[#D90000]'
               }`}>
-                {decisions.length === 3 ? '전 문항 마킹 완료' : `${3 - decisions.length}문항 미마킹`}
+                {answeredCount === 3 ? '전 문항 마킹 완료' : `${3 - answeredCount}문항 미마킹`}
               </span>
             </div>
           </div>
@@ -117,12 +120,19 @@ export const OmrSheetModal: React.FC<OmrSheetModalProps> = ({
                       </td>
                       <td className="border-r border-gray-300 p-2">
                         {d ? (
-                          <div className="flex flex-wrap gap-1">
-                            {d.reasons.map((r) => (
-                              <span key={r} className="bg-gray-100 border border-gray-300 px-1 py-0.2 text-[10px]">
-                                {reasonMap[r] || r}
+                          <div className="flex flex-col gap-1">
+                            <div className="flex flex-wrap gap-1">
+                              {d.reasons.map((r) => (
+                                <span key={r} className="bg-gray-100 border border-gray-300 px-1 py-0.2 text-[10px]">
+                                  {reasonMap[r] || r}
+                                </span>
+                              ))}
+                            </div>
+                            {d.memo && (
+                              <span className="text-[10px] leading-snug text-gray-700 break-words">
+                                직접 입력: {d.memo}
                               </span>
-                            ))}
+                            )}
                           </div>
                         ) : (
                           <span className="text-gray-400">-</span>

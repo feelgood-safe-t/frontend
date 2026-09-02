@@ -31,6 +31,8 @@ export const ResultReportModal: React.FC<ResultReportModalProps> = ({
   let correctCount = 0;
   let rationalityScore = 0;
   let intuitionPenalty = 0;
+  const answeredAssetIds = new Set(decisions.map((decision) => decision.assetId));
+  const unansweredCount = Math.max(0, 3 - answeredAssetIds.size);
 
   decisions.forEach((d) => {
     const isCorrect = d.direction === correctDirections[d.assetId];
@@ -127,10 +129,15 @@ export const ResultReportModal: React.FC<ResultReportModalProps> = ({
                 </span>
                 <span className="text-lg font-bold text-gray-600 ml-1">점</span>
               </div>
-              <div className="text-[11px] text-gray-500 border-t border-gray-300 pt-1 flex justify-between">
+              <div className="text-[11px] text-gray-500 border-t border-gray-300 pt-1 flex flex-wrap justify-between gap-x-3 gap-y-1">
                 <span>정답 점수: {correctCount * 25}점</span>
                 <span>합리성 가점: +{rationalityScore}점</span>
                 {intuitionPenalty > 0 && <span className="text-red-600">직감 감점: -{intuitionPenalty}점</span>}
+                {unansweredCount > 0 && (
+                  <span className="text-red-600 font-bold">
+                    미응답: {unansweredCount}문항 (각 0점 처리)
+                  </span>
+                )}
               </div>
             </div>
 
@@ -222,7 +229,9 @@ export const ResultReportModal: React.FC<ResultReportModalProps> = ({
                         {row.correct === 'UP' ? '▲ 상승' : '▼ 하락'}
                       </td>
                       <td className="border-r border-gray-300 p-1.5 text-center font-bold font-mono">
-                        {isMatch ? (
+                        {!decision ? (
+                          <span className="text-[#D90000]">미응답 (0점)</span>
+                        ) : isMatch ? (
                           <span className="text-[#008000]">정답</span>
                         ) : (
                           <span className="text-[#D90000]">오답</span>
