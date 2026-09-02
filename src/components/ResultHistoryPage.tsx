@@ -3,9 +3,11 @@ import {
   AssessmentResultSnapshot,
   StoredResultHistoryRead,
 } from '../assessmentResult';
+import { HomeLogo } from './HomeLogo';
 
 interface ResultHistoryPageProps {
   results: AssessmentResultSnapshot[];
+  onGoHome: () => void;
   storageStatus: StoredResultHistoryRead['status'];
   invalidCount: number;
   onOpenResult: (result: AssessmentResultSnapshot) => void;
@@ -30,6 +32,7 @@ const formatElapsedTime = (seconds: number) => {
 
 export const ResultHistoryPage: React.FC<ResultHistoryPageProps> = ({
   results,
+  onGoHome,
   storageStatus,
   invalidCount,
   onOpenResult,
@@ -57,12 +60,7 @@ export const ResultHistoryPage: React.FC<ResultHistoryPageProps> = ({
     <div className="min-h-dvh bg-[#E7EBEF] font-gulim text-black flex flex-col">
       <header className="bg-[#004080] text-white border-b-2 border-black px-4 py-3">
         <div className="w-full max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-lg font-black">SAFE:T 평가 기록</div>
-            <div className="text-[11px] text-blue-100">
-              누적 평가 결과
-            </div>
-          </div>
+          <HomeLogo onGoHome={onGoHome} />
           <div className="flex items-center gap-2">
             {(results.length > 0 || isStorageInvalid) && (
               <button

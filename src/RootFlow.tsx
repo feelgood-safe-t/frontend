@@ -24,6 +24,7 @@ import {
 
 interface VerificationRouteProps {
   historyState: StoredResultHistoryRead;
+  onGoHome: () => void;
   onOpenHistory: () => void;
   onRetakeSame: (result: AssessmentResultSnapshot) => void;
   onStartNew: () => void;
@@ -37,6 +38,7 @@ interface HomeRouteState {
 
 const VerificationRoute: React.FC<VerificationRouteProps> = ({
   historyState,
+  onGoHome,
   onOpenHistory,
   onRetakeSame,
   onStartNew,
@@ -53,6 +55,7 @@ const VerificationRoute: React.FC<VerificationRouteProps> = ({
       result={verificationResult}
       resultStatus={historyState.status}
       requestedCode={requestedCode}
+      onGoHome={onGoHome}
       onOpenHistory={onOpenHistory}
       onRetakeSame={onRetakeSame}
       onStartNew={onStartNew}
@@ -73,6 +76,23 @@ export default function RootFlow() {
     initialHistory.status === 'found' || initialHistory.status === 'invalid'
       ? 'history'
       : 'onboarding';
+
+  const handleGoHome = () => {
+    const nextHistory = readAssessmentResultHistory();
+    setHistoryState(nextHistory);
+    setOnboardingResult(null);
+    setScenarioMatch(null);
+    setHasLiveExam(false);
+    navigate('/', {
+      replace: true,
+      state: {
+        homeView:
+          nextHistory.status === 'found' || nextHistory.status === 'invalid'
+            ? 'history'
+            : 'onboarding',
+      } satisfies HomeRouteState,
+    });
+  };
 
   useEffect(() => {
     setHistoryState(readAssessmentResultHistory());
@@ -151,6 +171,7 @@ export default function RootFlow() {
 
   const onboardingPage = (
     <OnboardingSurvey
+      onGoHome={handleGoHome}
       historyCount={historyResults.length}
       onOpenHistory={handleOpenHistory}
       onComplete={(result) => {
@@ -165,6 +186,7 @@ export default function RootFlow() {
   ) : onboardingResult ? (
     <ScenarioMatchScreen
       surveyResult={onboardingResult}
+      onGoHome={handleGoHome}
       onStart={(match) => {
         setScenarioMatch(match);
         setHasLiveExam(true);
@@ -187,6 +209,7 @@ export default function RootFlow() {
   const historyPage = (
     <ResultHistoryPage
       results={historyResults}
+      onGoHome={handleGoHome}
       storageStatus={historyState.status}
       invalidCount={historyState.invalidCount}
       onOpenResult={handleOpenVerification}
@@ -234,6 +257,7 @@ export default function RootFlow() {
           element={
             <VerificationRoute
               historyState={historyState}
+              onGoHome={handleGoHome}
               onOpenHistory={handleOpenHistory}
               onRetakeSame={handleRetakeStoredAssessment}
               onStartNew={handleStartNewAssessment}

@@ -4,8 +4,10 @@ import {
   ONBOARDING_QUESTIONNAIRE_VERSION,
 } from '../data/onboardingQuestions';
 import { OnboardingQuestion, OnboardingSurveyResult } from '../onboardingTypes';
+import { HomeLogo } from './HomeLogo';
 
 interface OnboardingSurveyProps {
+  onGoHome: () => void;
   onComplete: (result: OnboardingSurveyResult) => void;
   historyCount?: number;
   onOpenHistory?: () => void;
@@ -17,6 +19,7 @@ const hasValidAnswer = (question: OnboardingQuestion, optionIds: string[] = []) 
   optionIds.length >= question.minSelections && optionIds.length <= question.maxSelections;
 
 export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
+  onGoHome,
   onComplete,
   historyCount = 0,
   onOpenHistory,
@@ -122,20 +125,21 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
     });
   };
 
+  const handleGoHome = () => {
+    setHasStarted(false);
+    setCurrentIndex(0);
+    setMaxVisitedIndex(0);
+    setAnswers({});
+    setValidationError('');
+    onGoHome();
+  };
+
   if (!hasStarted) {
     return (
       <div className="min-h-dvh bg-[#E7EBEF] text-black font-gulim flex flex-col">
         <header className="bg-[#004080] text-white border-b-2 border-black">
           <div className="w-full max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white text-[#004080] border-2 border-white font-black flex items-center justify-center text-sm">
-                S:T
-              </div>
-              <div>
-                <div className="text-lg font-black">SAFE:T 위험 대응 평가</div>
-                <div className="text-[11px] text-blue-100">사전 온보딩 · 시나리오 설정</div>
-              </div>
-            </div>
+            <HomeLogo onGoHome={handleGoHome} />
             <span className="hidden sm:inline border border-blue-200 bg-[#002B57] px-3 py-1 text-xs font-bold">
               1단계 / 사전 설문
             </span>
@@ -211,15 +215,7 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
     <div className="min-h-dvh bg-[#E7EBEF] text-black font-gulim flex flex-col">
       <header className="bg-[#004080] text-white border-b-2 border-black">
         <div className="w-full max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-white text-[#004080] border border-white font-black flex items-center justify-center text-xs">
-              S:T
-            </div>
-            <div>
-              <div className="text-base font-black">사전 성향 설문</div>
-              <div className="text-[11px] text-blue-100">위험 대응 시뮬레이션 온보딩</div>
-            </div>
-          </div>
+          <HomeLogo onGoHome={handleGoHome} />
           <div className="flex items-center gap-3 text-xs">
             <span className="text-blue-100">응답 현황</span>
             <strong className="bg-white text-[#004080] border border-black px-2 py-1 font-mono">

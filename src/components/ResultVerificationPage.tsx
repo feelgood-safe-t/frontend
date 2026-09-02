@@ -4,11 +4,13 @@ import {
   RESULT_QUESTIONS,
 } from '../assessmentResult';
 import { ReasonCategory } from '../types';
+import { HomeLogo } from './HomeLogo';
 
 interface ResultVerificationPageProps {
   result: AssessmentResultSnapshot | null;
   resultStatus: 'found' | 'empty' | 'invalid' | 'unavailable';
   requestedCode: string | null;
+  onGoHome: () => void;
   onOpenHistory: () => void;
   onRetakeSame: (result: AssessmentResultSnapshot) => void;
   onStartNew: () => void;
@@ -46,6 +48,7 @@ export const ResultVerificationPage: React.FC<ResultVerificationPageProps> = ({
   result,
   resultStatus,
   requestedCode,
+  onGoHome,
   onOpenHistory,
   onRetakeSame,
   onStartNew,
@@ -80,10 +83,7 @@ export const ResultVerificationPage: React.FC<ResultVerificationPageProps> = ({
       <div className="min-h-dvh bg-[#E7EBEF] font-gulim text-black flex flex-col">
         <header className="bg-[#004080] text-white border-b-2 border-black px-4 py-3">
           <div className="w-full max-w-4xl mx-auto flex items-center justify-between gap-3">
-            <div>
-              <div className="text-lg font-black">SAFE:T 결과 확인</div>
-              <div className="text-[11px] text-blue-100">평가 결과 검증</div>
-            </div>
+            <HomeLogo onGoHome={onGoHome} />
             <span className="border border-blue-200 bg-[#002B57] px-3 py-1 text-xs font-bold">
               VERIFY
             </span>
@@ -135,10 +135,7 @@ export const ResultVerificationPage: React.FC<ResultVerificationPageProps> = ({
     <div className="min-h-dvh bg-[#E7EBEF] font-gulim text-black flex flex-col">
       <header className="bg-[#004080] text-white border-b-2 border-black px-4 py-3 print:bg-white print:text-black">
         <div className="w-full max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-lg font-black">SAFE:T 결과 확인</div>
-            <div className="text-[11px] text-blue-100 print:text-gray-700">평가 결과 검증</div>
-          </div>
+          <HomeLogo onGoHome={onGoHome} />
           <span className="border border-white bg-[#177245] px-3 py-1 text-xs font-black">
             저장 이력 일치
           </span>

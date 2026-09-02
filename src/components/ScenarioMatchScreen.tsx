@@ -2,9 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { matchScenario } from '../data/mockScenarioMatches';
 import { OnboardingSurveyResult } from '../onboardingTypes';
 import { ScenarioDifficulty, ScenarioMatchResult } from '../scenarioTypes';
+import { HomeLogo } from './HomeLogo';
 
 interface ScenarioMatchScreenProps {
   surveyResult: OnboardingSurveyResult;
+  onGoHome: () => void;
   onStart: (match: ScenarioMatchResult) => void;
   onRestartSurvey: () => void;
 }
@@ -17,6 +19,7 @@ const DIFFICULTY_STYLES: Record<ScenarioDifficulty, string> = {
 
 export const ScenarioMatchScreen: React.FC<ScenarioMatchScreenProps> = ({
   surveyResult,
+  onGoHome,
   onStart,
   onRestartSurvey,
 }) => {
@@ -39,15 +42,7 @@ export const ScenarioMatchScreen: React.FC<ScenarioMatchScreenProps> = ({
       <div className="min-h-dvh bg-[#E7EBEF] text-black font-gulim flex flex-col">
         <header className="bg-[#004080] text-white border-b-2 border-black">
           <div className="w-full max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-white text-[#004080] border border-white font-black flex items-center justify-center text-xs">
-                S:T
-              </div>
-              <div>
-                <div className="text-base font-black">설문 응답 분석</div>
-                <div className="text-[11px] text-blue-100">교육 시나리오 자동 매칭</div>
-              </div>
-            </div>
+            <HomeLogo onGoHome={onGoHome} />
             <span className="border border-blue-200 bg-[#002B57] px-3 py-1 text-xs font-bold">
               2단계 / 시나리오 설정
             </span>
@@ -115,15 +110,7 @@ export const ScenarioMatchScreen: React.FC<ScenarioMatchScreenProps> = ({
     <div className="min-h-dvh bg-[#E7EBEF] text-black font-gulim flex flex-col">
       <header className="bg-[#004080] text-white border-b-2 border-black">
         <div className="w-full max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-white text-[#004080] border border-white font-black flex items-center justify-center text-xs">
-              S:T
-            </div>
-            <div>
-              <div className="text-base font-black">시나리오 매칭 결과</div>
-              <div className="text-[11px] text-blue-100">위험 대응 시뮬레이션 준비</div>
-            </div>
-          </div>
+          <HomeLogo onGoHome={onGoHome} />
           <span className="border border-blue-200 bg-[#002B57] px-3 py-1 text-xs font-bold">
             2단계 / 배정 완료
           </span>
