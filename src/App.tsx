@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   AssetCategory,
   AssetData,
@@ -19,8 +19,22 @@ import { OmrSheetModal } from './components/OmrSheetModal';
 import { ExamNoticeModal } from './components/ExamNoticeModal';
 import { ResultReportModal } from './components/ResultReportModal';
 import { FinishExamModal } from './components/FinishExamModal';
+import { OnboardingSurveyResult } from './onboardingTypes';
+import { ScenarioMatchResult } from './scenarioTypes';
+import {
+  AssessmentResultSnapshot,
+  createAssessmentResult,
+  ExamFinishReason,
+  saveAssessmentResult,
+} from './assessmentResult';
 
 const EXAM_DURATION_SECONDS = 6 * 60;
+
+const SCENARIO_SIMULATION_SETTINGS = {
+  기초: { volatilityScale: 0.7, tickIntervalMs: 1000 },
+  균형: { volatilityScale: 1, tickIntervalMs: 800 },
+  도전: { volatilityScale: 1.35, tickIntervalMs: 650 },
+} as const;
 
 const EXAM_QUESTIONS: {
   id: AssetCategory;
@@ -32,7 +46,23 @@ const EXAM_QUESTIONS: {
   { id: 'stable', questionNumber: 3, assetName: INITIAL_ASSETS.stable.name },
 ];
 
-export default function App() {
+interface AppProps {
+  onboardingResult: OnboardingSurveyResult;
+  scenarioMatch: ScenarioMatchResult;
+  onResultSaved: (result: AssessmentResultSnapshot, isPersisted: boolean) => void;
+  onOpenVerification: (result: AssessmentResultSnapshot) => void;
+  onOpenHistory: () => void;
+  onStartNewAssessment: () => void;
+}
+
+export default function App({
+  onboardingResult,
+  scenarioMatch,
+  onResultSaved,
+  onOpenVerification,
+  onOpenHistory,
+  onStartNewAssessment,
+}: AppProps) {
   // Candidate & Exam Info
   const [candidateNumber] = useState<string>('KR-2026-8849-ANON');
   const [terminalNumber] = useState<string>('04-B');
@@ -57,6 +87,54 @@ export default function App() {
   const [isNoticeOpen, setIsNoticeOpen] = useState<boolean>(false);
   const [isFinishConfirmOpen, setIsFinishConfirmOpen] = useState<boolean>(false);
   const [isResultOpen, setIsResultOpen] = useState<boolean>(false);
+  const [resultSnapshot, setResultSnapshot] = useState<AssessmentResultSnapshot | null>(null);
+  const [isResultPersisted, setIsResultPersisted] = useState<boolean>(false);
+  const hasFinalizedRef = useRef(false);
+  const examStartedAtRef = useRef(Date.now());
+  const simulationSettings = SCENARIO_SIMULATION_SETTINGS[scenarioMatch.difficulty];
+
+  const finalizeExam = useCallback(
+    (finishReason: ExamFinishReason) => {
+      if (hasFinalizedRef.current) return;
+      hasFinalizedRef.current = true;
+
+      const snapshot = createAssessmentResult({
+        candidate: {
+          number: candidateNumber,
+          roomName,
+          terminalNumber,
+        },
+        decisions,
+        elapsedSeconds: Math.min(
+          EXAM_DURATION_SECONDS,
+          Math.max(0, Math.floor((Date.now() - examStartedAtRef.current) / 1000)),
+        ),
+        durationSeconds: EXAM_DURATION_SECONDS,
+        finishReason,
+        onboarding: onboardingResult,
+        scenario: scenarioMatch,
+      });
+
+      const isPersisted = saveAssessmentResult(snapshot);
+      setResultSnapshot(snapshot);
+      setIsResultPersisted(isPersisted);
+      onResultSaved(snapshot, isPersisted);
+      setIsSimulating(false);
+      setIsDecisionModalOpen(false);
+      setIsOmrOpen(false);
+      setIsNoticeOpen(false);
+      setIsFinishConfirmOpen(false);
+      setIsResultOpen(true);
+    }, [
+      candidateNumber,
+      decisions,
+      onboardingResult,
+      onResultSaved,
+      roomName,
+      scenarioMatch,
+      terminalNumber,
+    ],
+  );
 
   // One deadline-based six-minute countdown for all three asset questions.
   // Deriving the display from a deadline keeps the timer accurate after a
@@ -68,19 +146,13 @@ export default function App() {
       const nextRemaining = Math.max(0, Math.ceil((timerDeadline - Date.now()) / 1000));
       setTimeRemaining(nextRemaining);
 
-      if (nextRemaining === 0) {
-        setIsDecisionModalOpen(false);
-        setIsOmrOpen(false);
-        setIsNoticeOpen(false);
-        setIsFinishConfirmOpen(false);
-        setIsResultOpen(true);
-      }
+      if (nextRemaining === 0) finalizeExam('TIMEOUT');
     };
 
     updateTimer();
     const timer = window.setInterval(updateTimer, 250);
     return () => clearInterval(timer);
-  }, [timerDeadline, isResultOpen]);
+  }, [timerDeadline, isResultOpen, finalizeExam]);
 
   // 60x Market Simulation Ticker (Ticks every 800ms)
   const advanceMarketTick = useCallback(() => {
@@ -97,7 +169,9 @@ export default function App() {
           const currentCandle = { ...candles[lastIndex] };
 
           // Volatility multiplier by asset type
-          const volMultiplier = cat === 'leverage' ? 0.004 : cat === 'stable' ? 0.0001 : 0.0012;
+          const baseVolatility =
+            cat === 'leverage' ? 0.004 : cat === 'stable' ? 0.0001 : 0.0012;
+          const volMultiplier = baseVolatility * simulationSettings.volatilityScale;
           const delta = (Math.random() - 0.49) * volMultiplier * asset.basePrice;
           const newClose = Math.round(currentCandle.close + delta);
           const newHigh = Math.max(currentCandle.high, newClose);
@@ -160,13 +234,13 @@ export default function App() {
 
       return nextTick;
     });
-  }, []);
+  }, [simulationSettings.volatilityScale]);
 
   useEffect(() => {
     if (!isSimulating || isResultOpen) return;
-    const interval = setInterval(advanceMarketTick, 800);
+    const interval = setInterval(advanceMarketTick, simulationSettings.tickIntervalMs);
     return () => clearInterval(interval);
-  }, [isSimulating, isResultOpen, advanceMarketTick]);
+  }, [isSimulating, isResultOpen, advanceMarketTick, simulationSettings.tickIntervalMs]);
 
   // Open Decision Modal
   const handleSelectDirection = (direction: DirectionType) => {
@@ -214,16 +288,31 @@ export default function App() {
   };
 
   const handleRequestFinish = () => {
-    if (isResultOpen) return;
+    if (isResultOpen || hasFinalizedRef.current) return;
     setIsFinishConfirmOpen(true);
   };
 
   const handleConfirmFinish = () => {
+    finalizeExam('EARLY');
+  };
+
+  const handleRetakeSameAssessment = () => {
+    hasFinalizedRef.current = false;
+    examStartedAtRef.current = Date.now();
+    setDecisions([]);
+    setTimeRemaining(EXAM_DURATION_SECONDS);
+    setTimerDeadline(Date.now() + EXAM_DURATION_SECONDS * 1000);
+    setTickCount(1);
+    setIsSimulating(true);
     setIsDecisionModalOpen(false);
     setIsOmrOpen(false);
     setIsNoticeOpen(false);
     setIsFinishConfirmOpen(false);
-    setIsResultOpen(true);
+    setIsResultOpen(false);
+    setResultSnapshot(null);
+    setIsResultPersisted(false);
+    setCurrentTab('normal');
+    setAssets(INITIAL_ASSETS);
   };
 
   // Global Key Handler for standard modal escape
@@ -265,6 +354,7 @@ export default function App() {
         candidateNumber={candidateNumber}
         terminalNumber={terminalNumber}
         roomName={roomName}
+        scenarioName={scenarioMatch.name}
         answeredCount={answeredCount}
         totalQuestions={EXAM_QUESTIONS.length}
         onOpenNotice={() => setIsNoticeOpen(true)}
@@ -280,6 +370,15 @@ export default function App() {
         onSelectTab={(tab) => setCurrentTab(tab)}
         decisions={decisions}
       />
+
+      <div className="shrink-0 border-b border-black bg-[#FFFBE6] px-3 py-1 text-[11px] flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <span>
+          <strong>{scenarioMatch.difficulty} 과정</strong> · {scenarioMatch.focusAreas.join(' · ')}
+        </span>
+        <span className="font-mono text-gray-600">
+          MOCK SIMULATION · {simulationSettings.volatilityScale.toFixed(2)}x 변동 강도
+        </span>
+      </div>
 
       {/* 3. Main Examination Workspace: Internal Vertical Scroll Area (No horizontal scroll) */}
       <main className="flex-1 w-full overflow-y-auto overflow-x-hidden p-2.5 max-w-[1680px] mx-auto flex flex-col gap-2.5">
@@ -341,6 +440,7 @@ export default function App() {
       <ExamNoticeModal
         isOpen={isNoticeOpen}
         onClose={() => setIsNoticeOpen(false)}
+        scenario={scenarioMatch}
       />
 
       {/* 6. Manual Finish Confirmation (timer expiry bypasses this dialog) */}
@@ -356,24 +456,14 @@ export default function App() {
       {/* 7. Final CBT Scorecard & Pass Certificate Modal */}
       <ResultReportModal
         isOpen={isResultOpen}
-        decisions={decisions}
-        candidateNumber={candidateNumber}
-        roomName={roomName}
-        terminalNumber={terminalNumber}
-        onRetake={() => {
-          setDecisions([]);
-          setTimeRemaining(EXAM_DURATION_SECONDS);
-          setTimerDeadline(Date.now() + EXAM_DURATION_SECONDS * 1000);
-          setTickCount(1);
-          setIsSimulating(true);
-          setIsDecisionModalOpen(false);
-          setIsOmrOpen(false);
-          setIsNoticeOpen(false);
-          setIsFinishConfirmOpen(false);
-          setIsResultOpen(false);
-          setCurrentTab('normal');
-          setAssets(INITIAL_ASSETS);
+        result={resultSnapshot}
+        isPersisted={isResultPersisted}
+        onOpenVerification={() => {
+          if (resultSnapshot && isResultPersisted) onOpenVerification(resultSnapshot);
         }}
+        onOpenHistory={onOpenHistory}
+        onRetakeSame={handleRetakeSameAssessment}
+        onStartNew={onStartNewAssessment}
       />
     </div>
   );

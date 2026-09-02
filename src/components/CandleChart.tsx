@@ -384,7 +384,7 @@ export const CandleChart: React.FC<CandleChartProps> = ({
           ※ 빨간색 캔들: 상승(양봉) | 파란색 캔들: 하락(음봉) | 주황색 점선: 전일 기준가
         </div>
         <div>
-          국가공인 표준 모눈 차트규격 (ISO-KR-FIN-2026)
+          SAFE:T 교육용 모눈 차트규격 (SIM-FIN-2026)
         </div>
       </div>
     </div>

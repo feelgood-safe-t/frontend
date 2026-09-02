@@ -5,6 +5,7 @@ interface HeaderProps {
   candidateNumber: string;
   terminalNumber: string;
   roomName: string;
+  scenarioName: string;
   answeredCount: number;
   totalQuestions: number;
   onOpenNotice: () => void;
@@ -19,6 +20,7 @@ export const Header: React.FC<HeaderProps> = ({
   candidateNumber,
   terminalNumber,
   roomName,
+  scenarioName,
   answeredCount,
   totalQuestions,
   onOpenNotice,
@@ -74,7 +76,7 @@ export const Header: React.FC<HeaderProps> = ({
               <span>금융위험 대응 능력 평가</span>
             </div>
             <div className="text-[11px] text-blue-200">
-              실시간 시장 위험 인지 및 의사결정 실기평가
+              {scenarioName} · 실시간 시장 위험 인지 및 의사결정 실기평가
             </div>
           </div>
         </div>

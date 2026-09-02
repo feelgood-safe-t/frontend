@@ -1,11 +1,13 @@
 import React from 'react';
+import { ScenarioMatchResult } from '../scenarioTypes';
 
 interface ExamNoticeModalProps {
   isOpen: boolean;
   onClose: () => void;
+  scenario: ScenarioMatchResult;
 }
 
-export const ExamNoticeModal: React.FC<ExamNoticeModalProps> = ({ isOpen, onClose }) => {
+export const ExamNoticeModal: React.FC<ExamNoticeModalProps> = ({ isOpen, onClose, scenario }) => {
   if (!isOpen) return null;
 
   return (
@@ -35,7 +37,26 @@ export const ExamNoticeModal: React.FC<ExamNoticeModalProps> = ({ isOpen, onClos
 
           <div>
             <h3 className="font-bold text-sm text-black mb-1">
-              2. 문항 구성
+              2. 배정된 교육 시나리오
+            </h3>
+            <div className="border border-black bg-[#FFFBE6] p-3">
+              <div className="font-black text-[#004080]">
+                {scenario.name} · {scenario.difficulty}
+              </div>
+              <p className="mt-1 text-gray-700">{scenario.summary}</p>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {scenario.focusAreas.map((area) => (
+                  <span key={area} className="border border-[#004080] bg-white px-2 py-0.5 text-[10px] font-bold text-[#004080]">
+                    {area}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="font-bold text-sm text-black mb-1">
+              3. 문항 구성
             </h3>
             <ul className="list-disc list-inside space-y-1 text-gray-800 bg-[#F9F9F9] p-3 border border-black font-mono">
               <li>
@@ -52,7 +73,7 @@ export const ExamNoticeModal: React.FC<ExamNoticeModalProps> = ({ isOpen, onClos
 
           <div>
             <h3 className="font-bold text-sm text-black mb-1">
-              3. 답안 입력 및 근거 선택
+              4. 답안 입력 및 근거 선택
             </h3>
             <p className="text-gray-700">
               각 문항에서 차트, 수급 지표, 공시를 확인한 후 [▲ 상승] 또는 [▼ 하락]을 선택하고,
@@ -62,7 +83,7 @@ export const ExamNoticeModal: React.FC<ExamNoticeModalProps> = ({ isOpen, onClos
 
           <div>
             <h3 className="font-bold text-sm text-black mb-1">
-              4. 제한 시간 및 시험 종료
+              5. 제한 시간 및 시험 종료
             </h3>
             <div className="bg-[#FFF9E6] border border-black p-2.5 text-gray-800">
               <p>
@@ -78,17 +99,17 @@ export const ExamNoticeModal: React.FC<ExamNoticeModalProps> = ({ isOpen, onClos
 
           <div>
             <h3 className="font-bold text-sm text-black mb-1">
-              5. 합격 기준
+              6. 교육 평가 기준
             </h3>
             <div className="bg-[#E6EEF8] border border-black p-2.5">
               <div className="font-bold text-[#004080]">
-                • 1등급: 80점 이상
-              </div>
-              <div className="font-bold text-[#004080] mt-0.5">
-                • 2등급: 60점 이상 (합격 기준)
+                • INVEST PASS: 70점 이상
               </div>
               <div className="text-gray-600 mt-1 text-[11px]">
                 ※ 단순 방향성 일치뿐만 아니라 공시·수급 등 합리적 근거 선택 여부와 과잉확신 페널티가 채점에 반영됩니다.
+              </div>
+              <div className="text-gray-600 mt-1 text-[11px]">
+                ※ 본 결과는 SAFE:T 자체 교육 기록이며 공인 금융 자격이나 실제 투자 적격성을 의미하지 않습니다.
               </div>
             </div>
           </div>

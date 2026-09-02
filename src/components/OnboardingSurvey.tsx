@@ -7,6 +7,8 @@ import { OnboardingQuestion, OnboardingSurveyResult } from '../onboardingTypes';
 
 interface OnboardingSurveyProps {
   onComplete: (result: OnboardingSurveyResult) => void;
+  historyCount?: number;
+  onOpenHistory?: () => void;
 }
 
 type AnswerMap = Record<string, string[]>;
@@ -14,7 +16,11 @@ type AnswerMap = Record<string, string[]>;
 const hasValidAnswer = (question: OnboardingQuestion, optionIds: string[] = []) =>
   optionIds.length >= question.minSelections && optionIds.length <= question.maxSelections;
 
-export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({ onComplete }) => {
+export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
+  onComplete,
+  historyCount = 0,
+  onOpenHistory,
+}) => {
   const [hasStarted, setHasStarted] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [maxVisitedIndex, setMaxVisitedIndex] = useState(0);
@@ -151,8 +157,8 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({ onComplete }
                 나에게 맞는 위험 대응 연습 설정
               </h1>
               <p className="mt-3 text-sm sm:text-base text-gray-700 leading-relaxed">
-                투자 경험과 판단 습관을 알려주세요. 응답은 추후 사용자에게 적합한 시뮬레이션을
-                자동으로 매칭하는 기준으로 사용됩니다.
+                투자 경험과 판단 습관을 알려주세요. 응답을 바탕으로 현재 목업에서 적합한 교육용
+                시뮬레이션을 자동으로 매칭합니다.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 border border-black mt-6 text-sm">
@@ -177,13 +183,22 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({ onComplete }
                   아닙니다. 실제 자산·소득·부채 등 개인정보는 입력하지 마세요.
                 </p>
                 <p className="mt-1 text-gray-600">
-                  현재 응답은 서버로 전송하지 않으며 이 브라우저 화면을 사용하는 동안에만 임시로
-                  유지됩니다.
+                  현재 응답은 서버로 전송하지 않습니다. 브라우저 저장소를 사용할 수 있는 경우 평가
+                  완료 후 누적 평가 이력에 추가되며, 이력 화면에서 직접 삭제할 수 있습니다.
                 </p>
               </div>
             </div>
 
-            <div className="bg-[#E0E0E0] border-t border-black px-4 py-3 flex justify-end">
+            <div className="bg-[#E0E0E0] border-t border-black px-4 py-3 flex flex-col-reverse sm:flex-row justify-between gap-2">
+              {historyCount > 0 && onOpenHistory ? (
+                <button
+                  type="button"
+                  onClick={onOpenHistory}
+                  className="min-h-11 bg-white hover:bg-gray-100 text-black border-2 border-black px-5 py-2 text-sm font-bold cursor-pointer"
+                >
+                  지난 평가 기록 {historyCount}건
+                </button>
+              ) : <span />}
               <button
                 type="button"
                 onClick={() => setHasStarted(true)}
