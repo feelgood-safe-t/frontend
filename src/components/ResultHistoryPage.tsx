@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   AssessmentResultSnapshot,
   StoredResultHistoryRead,
@@ -38,6 +38,8 @@ export const ResultHistoryPage: React.FC<ResultHistoryPageProps> = ({
   onClearHistory,
 }) => {
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
+  const resetTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const resetCancelRef = useRef<HTMLButtonElement | null>(null);
   const sortedResults = [...results].sort(
     (left, right) =>
       new Date(right.completedAt).getTime() - new Date(left.completedAt).getTime(),
@@ -54,6 +56,20 @@ export const ResultHistoryPage: React.FC<ResultHistoryPageProps> = ({
   const isStorageUnavailable = storageStatus === 'unavailable';
   const isStorageInvalid = storageStatus === 'invalid';
 
+  useEffect(() => {
+    if (isClearConfirmOpen) resetCancelRef.current?.focus();
+  }, [isClearConfirmOpen]);
+
+  const handleOpenResetConfirm = (event: React.MouseEvent<HTMLButtonElement>) => {
+    resetTriggerRef.current = event.currentTarget;
+    setIsClearConfirmOpen(true);
+  };
+
+  const handleCancelReset = () => {
+    setIsClearConfirmOpen(false);
+    resetTriggerRef.current?.focus();
+  };
+
   return (
     <div className="min-h-dvh bg-[#E7EBEF] font-gulim text-black flex flex-col">
       <header className="bg-[#004080] text-white border-b-2 border-black px-4 py-3">
@@ -61,12 +77,25 @@ export const ResultHistoryPage: React.FC<ResultHistoryPageProps> = ({
           <div>
             <div className="text-lg font-black">SAFE:T 평가 기록</div>
             <div className="text-[11px] text-blue-100">
-              이 브라우저에 저장된 교육 평가 결과
+              누적 평가 결과
             </div>
           </div>
-          <span className="border border-blue-200 bg-[#002B57] px-3 py-1 text-xs font-bold">
-            HISTORY
-          </span>
+          <div className="flex items-center gap-2">
+            {(results.length > 0 || isStorageInvalid) && (
+              <button
+                type="button"
+                onClick={handleOpenResetConfirm}
+                aria-expanded={isClearConfirmOpen}
+                aria-controls="history-reset-confirm"
+                className="min-h-9 bg-white hover:bg-[#FFF0F0] text-[#B00000] border-2 border-black px-3 py-1 text-xs font-black cursor-pointer"
+              >
+                테스트 데이터 리셋
+              </button>
+            )}
+            <span className="border border-blue-200 bg-[#002B57] px-3 py-1 text-xs font-bold">
+              HISTORY
+            </span>
+          </div>
         </div>
       </header>
 
@@ -77,9 +106,45 @@ export const ResultHistoryPage: React.FC<ResultHistoryPageProps> = ({
               누적 평가 이력
             </h1>
             <span className="text-[11px] text-gray-600">
-              최신 완료 순 · 브라우저 로컬 기록
+              최신 완료 순
             </span>
           </div>
+
+          {isClearConfirmOpen && (
+            <div
+              id="history-reset-confirm"
+              role="alertdialog"
+              aria-labelledby="history-reset-title"
+              aria-describedby="history-reset-description"
+              className="border-b-2 border-[#B00000] bg-[#FFF0F0] p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs"
+            >
+              <div>
+                <div id="history-reset-title" className="font-black text-[#B00000]">
+                  로컬 테스트 데이터를 리셋할까요?
+                </div>
+                <p id="history-reset-description" className="mt-1 text-gray-700">
+                  모든 평가 기록을 삭제하고 같은 주소의 온보딩 화면으로 돌아갑니다. 삭제한 기록은 복구할 수 없습니다.
+                </p>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <button
+                  type="button"
+                  ref={resetCancelRef}
+                  onClick={handleCancelReset}
+                  className="min-h-9 bg-white hover:bg-gray-100 text-black border border-black px-3 py-1 font-bold cursor-pointer"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={onClearHistory}
+                  className="min-h-9 bg-[#B00000] hover:bg-[#820000] text-white border border-black px-3 py-1 font-black cursor-pointer"
+                >
+                  리셋 실행
+                </button>
+              </div>
+            </div>
+          )}
 
           {results.length === 0 ? (
             <div className="p-6 sm:p-10 text-center">
@@ -105,7 +170,7 @@ export const ResultHistoryPage: React.FC<ResultHistoryPageProps> = ({
               </p>
               <button
                 type="button"
-                onClick={isStorageInvalid ? () => setIsClearConfirmOpen(true) : onStartNew}
+                onClick={isStorageInvalid ? handleOpenResetConfirm : onStartNew}
                 className="mt-5 min-h-11 bg-[#004080] hover:bg-[#002B57] text-white border-2 border-black px-6 py-2 text-sm font-black cursor-pointer"
               >
                 {isStorageInvalid ? '손상 기록 정리' : '새 평가 시작'}
@@ -277,47 +342,11 @@ export const ResultHistoryPage: React.FC<ResultHistoryPageProps> = ({
                   ))}
                 </div>
               </section>
-
-              <aside className="border border-black bg-[#FFFBE6] p-3 text-xs leading-relaxed text-gray-800">
-                이 기록은 현재 브라우저에만 저장되는 PoC 교육 기록입니다. 서버 인증이나
-                위변조 검증을 제공하지 않으며, 공인 금융 자격 또는 실제 투자 적격성을 의미하지 않습니다.
-              </aside>
             </div>
           )}
 
           {(results.length > 0 || isStorageInvalid) && (
-            <div className="bg-[#E0E0E0] border-t border-black p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              {isClearConfirmOpen ? (
-                <div role="alert" className="border-2 border-[#B00000] bg-[#FFF0F0] p-2 flex flex-col sm:flex-row sm:items-center gap-2 text-xs">
-                  <span className="font-bold text-[#B00000]">
-                    모든 기록을 삭제하면 복구할 수 없습니다.
-                  </span>
-                  <div className="flex gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setIsClearConfirmOpen(false)}
-                      className="min-h-9 bg-white hover:bg-gray-100 text-black border border-black px-3 py-1 font-bold cursor-pointer"
-                    >
-                      취소
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onClearHistory}
-                      className="min-h-9 bg-[#B00000] hover:bg-[#820000] text-white border border-black px-3 py-1 font-black cursor-pointer"
-                    >
-                      정말 전체 삭제
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setIsClearConfirmOpen(true)}
-                  className="min-h-11 bg-white hover:bg-[#FFF0F0] text-[#B00000] border-2 border-[#B00000] px-4 py-2 text-xs font-black cursor-pointer"
-                >
-                  전체 기록 삭제
-                </button>
-              )}
+            <div className="bg-[#E0E0E0] border-t border-black p-3 flex justify-end">
               <button
                 type="button"
                 onClick={onStartNew}

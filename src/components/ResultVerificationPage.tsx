@@ -82,7 +82,7 @@ export const ResultVerificationPage: React.FC<ResultVerificationPageProps> = ({
           <div className="w-full max-w-4xl mx-auto flex items-center justify-between gap-3">
             <div>
               <div className="text-lg font-black">SAFE:T 결과 확인</div>
-              <div className="text-[11px] text-blue-100">브라우저 로컬 결과 검증</div>
+              <div className="text-[11px] text-blue-100">평가 결과 검증</div>
             </div>
             <span className="border border-blue-200 bg-[#002B57] px-3 py-1 text-xs font-bold">
               VERIFY
@@ -137,7 +137,7 @@ export const ResultVerificationPage: React.FC<ResultVerificationPageProps> = ({
         <div className="w-full max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-lg font-black">SAFE:T 결과 확인</div>
-            <div className="text-[11px] text-blue-100 print:text-gray-700">브라우저 로컬 결과 검증</div>
+            <div className="text-[11px] text-blue-100 print:text-gray-700">평가 결과 검증</div>
           </div>
           <span className="border border-white bg-[#177245] px-3 py-1 text-xs font-black">
             저장 이력 일치
@@ -148,7 +148,7 @@ export const ResultVerificationPage: React.FC<ResultVerificationPageProps> = ({
       <main className="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-4 py-5">
         <section className="bg-white border-2 border-black" aria-labelledby="verification-title">
           <div className="bg-[#E0E0E0] border-b border-black px-3 py-2 flex flex-wrap justify-between gap-2 text-xs">
-            <span className="font-black">로컬 결과 스냅샷</span>
+            <span className="font-black">평가 결과 상세</span>
             <span className="font-mono">{result.schemaVersion}</span>
           </div>
 
@@ -272,13 +272,6 @@ export const ResultVerificationPage: React.FC<ResultVerificationPageProps> = ({
                 </tbody>
               </table>
             </section>
-
-            <aside className="border border-black bg-[#FFFBE6] p-3 text-xs leading-relaxed text-gray-800">
-              <div className="font-black mb-1">검증 범위 안내</div>
-              이 화면은 동일 브라우저의 LocalStorage에 저장된 누적 평가 이력과 코드가 일치하는지
-              확인하는 PoC 기능입니다. 서버 서명이나 위변조 검증을 제공하지 않으며, SAFE:T가 발급하는
-              자체 교육 기록은 공인 금융 자격 또는 실제 투자 적격성을 의미하지 않습니다.
-            </aside>
           </div>
 
           <div className="bg-[#E0E0E0] border-t border-black p-3 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between print:hidden">

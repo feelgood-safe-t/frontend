@@ -108,9 +108,6 @@ export const ExamNoticeModal: React.FC<ExamNoticeModalProps> = ({ isOpen, onClos
               <div className="text-gray-600 mt-1 text-[11px]">
                 ※ 단순 방향성 일치뿐만 아니라 공시·수급 등 합리적 근거 선택 여부와 과잉확신 페널티가 채점에 반영됩니다.
               </div>
-              <div className="text-gray-600 mt-1 text-[11px]">
-                ※ 본 결과는 SAFE:T 자체 교육 기록이며 공인 금융 자격이나 실제 투자 적격성을 의미하지 않습니다.
-              </div>
             </div>
           </div>
         </div>

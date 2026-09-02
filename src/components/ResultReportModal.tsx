@@ -272,11 +272,6 @@ export const ResultReportModal: React.FC<ResultReportModalProps> = ({
               </button>
             </div>
           </div>
-
-          <aside className="border border-black bg-[#FFFBE6] p-3 text-[11px] leading-relaxed text-gray-800">
-            본 결과와 INVEST PASS는 SAFE:T가 제공하는 자체 교육 기록입니다. 공인 금융 자격,
-            금융상품 적합성 판정 또는 실제 투자 적격성을 의미하지 않습니다.
-          </aside>
         </div>
 
         <div className="bg-[#E0E0E0] border-t border-black p-3 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">

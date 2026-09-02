@@ -1,4 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+} from 'react-router';
 import App from './App';
 import { OnboardingSurvey } from './components/OnboardingSurvey';
 import { ResultHistoryPage } from './components/ResultHistoryPage';
@@ -14,105 +22,84 @@ import {
   StoredResultHistoryRead,
 } from './assessmentResult';
 
-type FlowPhase = 'onboarding' | 'matching' | 'exam' | 'verification' | 'history';
+interface VerificationRouteProps {
+  historyState: StoredResultHistoryRead;
+  onOpenHistory: () => void;
+  onRetakeSame: (result: AssessmentResultSnapshot) => void;
+  onStartNew: () => void;
+}
 
-const getVerificationCodeFromHash = () => {
-  if (typeof window === 'undefined') return null;
-  const match = window.location.hash.match(/^#verify\/(.+)$/i);
-  if (!match) return null;
+type HomeView = 'onboarding' | 'history';
 
-  try {
-    return decodeURIComponent(match[1]);
-  } catch {
-    return match[1];
-  }
-};
+interface HomeRouteState {
+  homeView?: HomeView;
+}
 
-const isHistoryHash = () =>
-  typeof window !== 'undefined' && /^#history$/i.test(window.location.hash);
+const VerificationRoute: React.FC<VerificationRouteProps> = ({
+  historyState,
+  onOpenHistory,
+  onRetakeSame,
+  onStartNew,
+}) => {
+  const { verificationCode } = useParams();
+  const historyResults = historyState.status === 'found' ? historyState.results : [];
+  const requestedCode = verificationCode ?? null;
+  const verificationResult = requestedCode
+    ? findAssessmentResultByVerificationCode(historyResults, requestedCode)
+    : null;
 
-const clearAppHash = () => {
-  if (typeof window === 'undefined' || !window.location.hash) return;
-  window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+  return (
+    <ResultVerificationPage
+      result={verificationResult}
+      resultStatus={historyState.status}
+      requestedCode={requestedCode}
+      onOpenHistory={onOpenHistory}
+      onRetakeSame={onRetakeSame}
+      onStartNew={onStartNew}
+    />
+  );
 };
 
 export default function RootFlow() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const initialHistory = useMemo(() => readAssessmentResultHistory(), []);
-  const initialRequestedCode = useMemo(() => getVerificationCodeFromHash(), []);
-  const initialHistoryRequested = useMemo(() => isHistoryHash(), []);
   const [onboardingResult, setOnboardingResult] = useState<OnboardingSurveyResult | null>(null);
   const [scenarioMatch, setScenarioMatch] = useState<ScenarioMatchResult | null>(null);
   const [historyState, setHistoryState] = useState<StoredResultHistoryRead>(initialHistory);
-  const [requestedCode, setRequestedCode] = useState<string | null>(initialRequestedCode);
   const [hasLiveExam, setHasLiveExam] = useState(false);
   const [examSessionKey, setExamSessionKey] = useState(0);
-  const [rootReturnPhase, setRootReturnPhase] = useState<'onboarding' | 'history'>(() =>
-    !initialRequestedCode && !initialHistoryRequested && initialHistory.status === 'found'
+  const initialHomeView: HomeView =
+    initialHistory.status === 'found' || initialHistory.status === 'invalid'
       ? 'history'
-      : 'onboarding',
-  );
-  const [phase, setPhase] = useState<FlowPhase>(() => {
-    if (initialRequestedCode) return 'verification';
-    if (initialHistoryRequested || initialHistory.status === 'found') return 'history';
-    if (initialHistory.status === 'invalid') return 'verification';
-    return 'onboarding';
-  });
+      : 'onboarding';
 
   useEffect(() => {
-    const handleRouteChange = () => {
-      const nextCode = getVerificationCodeFromHash();
-      const nextHistory = readAssessmentResultHistory();
-      setRequestedCode(nextCode);
-      setHistoryState(nextHistory);
-
-      if (nextCode) {
-        setPhase('verification');
-      } else if (isHistoryHash()) {
-        setPhase('history');
-      } else if (hasLiveExam) {
-        setPhase('exam');
-      } else if (rootReturnPhase === 'history' && nextHistory.status === 'found') {
-        setPhase('history');
-      } else if (nextHistory.status === 'invalid') {
-        setPhase('verification');
-      } else {
-        setPhase('onboarding');
-      }
-    };
-
-    window.addEventListener('hashchange', handleRouteChange);
-    window.addEventListener('popstate', handleRouteChange);
-    return () => {
-      window.removeEventListener('hashchange', handleRouteChange);
-      window.removeEventListener('popstate', handleRouteChange);
-    };
-  }, [hasLiveExam, rootReturnPhase]);
+    setHistoryState(readAssessmentResultHistory());
+  }, [location.pathname]);
 
   const handleStartNewAssessment = () => {
     if (historyState.status === 'invalid') {
-      window.history.pushState(null, '', '#history');
-      setPhase('history');
+      navigate('/', { state: { homeView: 'history' } satisfies HomeRouteState });
       window.alert('손상된 평가 이력을 먼저 삭제한 뒤 새 평가를 시작해 주세요.');
       return;
     }
 
-    clearAppHash();
-    setRequestedCode(null);
     setOnboardingResult(null);
     setScenarioMatch(null);
     setHasLiveExam(false);
-    setRootReturnPhase('onboarding');
-    setPhase('onboarding');
+    navigate('/', {
+      replace: true,
+      state: { homeView: 'onboarding' } satisfies HomeRouteState,
+    });
   };
 
   const handleRetakeStoredAssessment = (result: AssessmentResultSnapshot) => {
-    clearAppHash();
-    setRequestedCode(null);
     setOnboardingResult(result.onboarding);
     setScenarioMatch(result.scenario);
     setHasLiveExam(true);
     setExamSessionKey((current) => current + 1);
-    setPhase('exam');
+    navigate('/exam', { replace: true });
   };
 
   const handleResultSaved = (_result: AssessmentResultSnapshot, _isPersisted: boolean) => {
@@ -120,18 +107,21 @@ export default function RootFlow() {
   };
 
   const handleOpenVerification = (result: AssessmentResultSnapshot) => {
-    const encodedCode = encodeURIComponent(result.verificationCode);
-    window.history.pushState(null, '', `#verify/${encodedCode}`);
     setHistoryState(readAssessmentResultHistory());
-    setRequestedCode(result.verificationCode);
-    setPhase('verification');
+    navigate(`/verify/${encodeURIComponent(result.verificationCode)}`);
   };
 
   const handleOpenHistory = () => {
-    window.history.pushState(null, '', '#history');
-    setHistoryState(readAssessmentResultHistory());
-    setRequestedCode(null);
-    setPhase('history');
+    const nextHistory = readAssessmentResultHistory();
+    setHistoryState(nextHistory);
+    navigate('/', {
+      state: {
+        homeView:
+          nextHistory.status === 'found' || nextHistory.status === 'invalid'
+            ? 'history'
+            : 'onboarding',
+      } satisfies HomeRouteState,
+    });
   };
 
   const handleClearHistory = () => {
@@ -142,30 +132,56 @@ export default function RootFlow() {
       return;
     }
 
-    window.history.replaceState(null, '', '#history');
     setHistoryState({ status: 'empty', results: [], invalidCount: 0 });
-    setRequestedCode(null);
     setOnboardingResult(null);
     setScenarioMatch(null);
     setHasLiveExam(false);
-    setRootReturnPhase('onboarding');
-    setPhase('history');
+    navigate('/', {
+      replace: true,
+      state: { homeView: 'onboarding' } satisfies HomeRouteState,
+    });
   };
 
   const historyResults = historyState.status === 'found' ? historyState.results : [];
-  const verificationResult = requestedCode
-    ? findAssessmentResultByVerificationCode(historyResults, requestedCode)
-    : historyResults[0] ?? null;
+  const hasActiveExam = Boolean(hasLiveExam && onboardingResult && scenarioMatch);
+  const canShowHistory =
+    historyState.status === 'found' || historyState.status === 'invalid';
+  const homeRouteState = location.state as HomeRouteState | null;
+  const homeView = homeRouteState?.homeView ?? initialHomeView;
 
-  const verificationPage = (
-    <ResultVerificationPage
-      result={verificationResult}
-      resultStatus={historyState.status}
-      requestedCode={requestedCode}
+  const onboardingPage = (
+    <OnboardingSurvey
+      historyCount={historyResults.length}
       onOpenHistory={handleOpenHistory}
-      onRetakeSame={handleRetakeStoredAssessment}
-      onStartNew={handleStartNewAssessment}
+      onComplete={(result) => {
+        setOnboardingResult(result);
+        navigate('/matching', { replace: true });
+      }}
     />
+  );
+
+  const matchingPage = hasActiveExam ? (
+    <Navigate to="/exam" replace />
+  ) : onboardingResult ? (
+    <ScenarioMatchScreen
+      surveyResult={onboardingResult}
+      onStart={(match) => {
+        setScenarioMatch(match);
+        setHasLiveExam(true);
+        setExamSessionKey((current) => current + 1);
+        navigate('/exam', { replace: true });
+      }}
+      onRestartSurvey={() => {
+        setOnboardingResult(null);
+        setScenarioMatch(null);
+        navigate('/', {
+          replace: true,
+          state: { homeView: 'onboarding' } satisfies HomeRouteState,
+        });
+      }}
+    />
+  ) : (
+    <Navigate to="/" replace />
   );
 
   const historyPage = (
@@ -180,17 +196,20 @@ export default function RootFlow() {
     />
   );
 
-  if (
-    hasLiveExam &&
-    onboardingResult &&
-    scenarioMatch &&
-    (phase === 'exam' || phase === 'verification' || phase === 'history')
-  ) {
-    return (
-      <>
+  const homePage = homeView === 'history' && canShowHistory ? (
+    historyPage
+  ) : hasActiveExam ? (
+    <Navigate to="/exam" replace />
+  ) : (
+    onboardingPage
+  );
+
+  return (
+    <>
+      {hasActiveExam && onboardingResult && scenarioMatch && (
         <div
           key={examSessionKey}
-          className={phase === 'exam' ? undefined : 'hidden'}
+          className={location.pathname === '/exam' ? undefined : 'hidden'}
         >
           <App
             onboardingResult={onboardingResult}
@@ -201,46 +220,28 @@ export default function RootFlow() {
             onStartNewAssessment={handleStartNewAssessment}
           />
         </div>
-        {phase === 'verification' && verificationPage}
-        {phase === 'history' && historyPage}
-      </>
-    );
-  }
+      )}
 
-  if (phase === 'verification') return verificationPage;
-  if (phase === 'history') return historyPage;
-
-  if (phase === 'onboarding' || !onboardingResult) {
-    return (
-      <OnboardingSurvey
-        historyCount={historyResults.length}
-        onOpenHistory={handleOpenHistory}
-        onComplete={(result) => {
-          setOnboardingResult(result);
-          setPhase('matching');
-        }}
-      />
-    );
-  }
-
-  if (phase === 'matching' || !scenarioMatch) {
-    return (
-      <ScenarioMatchScreen
-        surveyResult={onboardingResult}
-        onStart={(match) => {
-          setScenarioMatch(match);
-          setHasLiveExam(true);
-          setExamSessionKey((current) => current + 1);
-          setPhase('exam');
-        }}
-        onRestartSurvey={() => {
-          setOnboardingResult(null);
-          setScenarioMatch(null);
-          setPhase('onboarding');
-        }}
-      />
-    );
-  }
-
-  return null;
+      <Routes>
+        <Route path="/" element={homePage} />
+        <Route path="/matching" element={matchingPage} />
+        <Route
+          path="/exam"
+          element={hasActiveExam ? null : <Navigate to="/" replace />}
+        />
+        <Route
+          path="/verify/:verificationCode"
+          element={
+            <VerificationRoute
+              historyState={historyState}
+              onOpenHistory={handleOpenHistory}
+              onRetakeSame={handleRetakeStoredAssessment}
+              onStartNew={handleStartNewAssessment}
+            />
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
+  );
 }
