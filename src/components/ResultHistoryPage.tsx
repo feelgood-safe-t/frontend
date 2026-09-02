@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import {
   AssessmentResultSnapshot,
   StoredResultHistoryRead,
@@ -37,9 +37,6 @@ export const ResultHistoryPage: React.FC<ResultHistoryPageProps> = ({
   onStartNew,
   onClearHistory,
 }) => {
-  const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
-  const resetTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const resetCancelRef = useRef<HTMLButtonElement | null>(null);
   const sortedResults = [...results].sort(
     (left, right) =>
       new Date(right.completedAt).getTime() - new Date(left.completedAt).getTime(),
@@ -56,20 +53,6 @@ export const ResultHistoryPage: React.FC<ResultHistoryPageProps> = ({
   const isStorageUnavailable = storageStatus === 'unavailable';
   const isStorageInvalid = storageStatus === 'invalid';
 
-  useEffect(() => {
-    if (isClearConfirmOpen) resetCancelRef.current?.focus();
-  }, [isClearConfirmOpen]);
-
-  const handleOpenResetConfirm = (event: React.MouseEvent<HTMLButtonElement>) => {
-    resetTriggerRef.current = event.currentTarget;
-    setIsClearConfirmOpen(true);
-  };
-
-  const handleCancelReset = () => {
-    setIsClearConfirmOpen(false);
-    resetTriggerRef.current?.focus();
-  };
-
   return (
     <div className="min-h-dvh bg-[#E7EBEF] font-gulim text-black flex flex-col">
       <header className="bg-[#004080] text-white border-b-2 border-black px-4 py-3">
@@ -84,9 +67,7 @@ export const ResultHistoryPage: React.FC<ResultHistoryPageProps> = ({
             {(results.length > 0 || isStorageInvalid) && (
               <button
                 type="button"
-                onClick={handleOpenResetConfirm}
-                aria-expanded={isClearConfirmOpen}
-                aria-controls="history-reset-confirm"
+                onClick={onClearHistory}
                 className="min-h-9 bg-white hover:bg-[#FFF0F0] text-[#B00000] border-2 border-black px-3 py-1 text-xs font-black cursor-pointer"
               >
                 테스트 데이터 리셋
@@ -110,42 +91,6 @@ export const ResultHistoryPage: React.FC<ResultHistoryPageProps> = ({
             </span>
           </div>
 
-          {isClearConfirmOpen && (
-            <div
-              id="history-reset-confirm"
-              role="alertdialog"
-              aria-labelledby="history-reset-title"
-              aria-describedby="history-reset-description"
-              className="border-b-2 border-[#B00000] bg-[#FFF0F0] p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs"
-            >
-              <div>
-                <div id="history-reset-title" className="font-black text-[#B00000]">
-                  로컬 테스트 데이터를 리셋할까요?
-                </div>
-                <p id="history-reset-description" className="mt-1 text-gray-700">
-                  모든 평가 기록을 삭제하고 같은 주소의 온보딩 화면으로 돌아갑니다. 삭제한 기록은 복구할 수 없습니다.
-                </p>
-              </div>
-              <div className="flex shrink-0 gap-2">
-                <button
-                  type="button"
-                  ref={resetCancelRef}
-                  onClick={handleCancelReset}
-                  className="min-h-9 bg-white hover:bg-gray-100 text-black border border-black px-3 py-1 font-bold cursor-pointer"
-                >
-                  취소
-                </button>
-                <button
-                  type="button"
-                  onClick={onClearHistory}
-                  className="min-h-9 bg-[#B00000] hover:bg-[#820000] text-white border border-black px-3 py-1 font-black cursor-pointer"
-                >
-                  리셋 실행
-                </button>
-              </div>
-            </div>
-          )}
-
           {results.length === 0 ? (
             <div className="p-6 sm:p-10 text-center">
               <div
@@ -156,21 +101,21 @@ export const ResultHistoryPage: React.FC<ResultHistoryPageProps> = ({
               </div>
               <h2 className="mt-4 text-xl font-black">
                 {isStorageUnavailable
-                  ? '브라우저 저장소를 사용할 수 없습니다.'
+                  ? '평가 기록 저장 기능을 사용할 수 없습니다.'
                   : isStorageInvalid
                     ? '저장된 평가 이력을 읽을 수 없습니다.'
                     : '아직 저장된 평가 기록이 없습니다.'}
               </h2>
               <p className="mt-2 text-sm text-gray-700 leading-relaxed">
                 {isStorageUnavailable
-                  ? '브라우저 저장소 접근이 차단되어 기록을 불러올 수 없습니다. 평가는 진행할 수 있지만 완료 결과는 새로고침 후 유지되지 않을 수 있습니다.'
+                  ? '저장 기능이 차단되어 기록을 불러올 수 없습니다. 평가는 진행할 수 있지만 완료 결과는 새로고침 후 유지되지 않을 수 있습니다.'
                   : isStorageInvalid
                     ? '저장된 이력 데이터가 손상되었거나 현재 버전에서 지원하지 않는 형식입니다. 전체 기록을 삭제한 뒤 다시 시작할 수 있습니다.'
                     : '평가를 완료하면 점수와 시나리오, 검증 코드를 이 화면에서 모아 볼 수 있습니다.'}
               </p>
               <button
                 type="button"
-                onClick={isStorageInvalid ? handleOpenResetConfirm : onStartNew}
+                onClick={isStorageInvalid ? onClearHistory : onStartNew}
                 className="mt-5 min-h-11 bg-[#004080] hover:bg-[#002B57] text-white border-2 border-black px-6 py-2 text-sm font-black cursor-pointer"
               >
                 {isStorageInvalid ? '손상 기록 정리' : '새 평가 시작'}

@@ -41,7 +41,7 @@ export const InfoFeedBBS: React.FC<InfoFeedBBSProps> = ({ bbsList }) => {
 
   return (
     <>
-      <div className="w-full bg-white border border-black flex flex-col select-none">
+      <div className="w-full bg-white border border-black flex flex-col">
         {/* BBS Header */}
         <div className="bg-[#E0E0E0] text-black px-3 py-1.5 text-xs font-bold flex items-center justify-between border-b border-black">
           <span className="font-black text-sm text-black">공시 및 뉴스 피드 (클릭 시 상세 팝업 열람)</span>
@@ -107,7 +107,7 @@ export const InfoFeedBBS: React.FC<InfoFeedBBSProps> = ({ bbsList }) => {
 
       {/* Selected Item Detail Popup Modal */}
       {modalItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-[1px] p-4 select-none">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-[1px] p-4">
           <div className="bg-[#E0E0E0] border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] w-full max-w-2xl flex flex-col animate-in fade-in zoom-in-95 duration-100">
             {/* Modal Title Bar */}
             <div className="bg-[#E0E0E0] text-black px-3 py-2 font-bold text-xs flex items-center justify-between border-b border-black">

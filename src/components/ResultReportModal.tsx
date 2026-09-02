@@ -48,7 +48,7 @@ export const ResultReportModal: React.FC<ResultReportModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-3 select-none overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-3 overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-labelledby="result-report-title"
@@ -243,15 +243,15 @@ export const ResultReportModal: React.FC<ResultReportModalProps> = ({
           >
             <div>
               <div className={`text-[11px] font-bold ${isPersisted ? 'text-[#145C38]' : 'text-[#B00000]'}`}>
-                {isPersisted ? '브라우저 결과 저장 완료' : '브라우저 결과 저장 실패'}
+                {isPersisted ? '결과 저장 완료' : '결과 저장 실패'}
               </div>
               <div className="mt-1 font-mono text-base font-black tracking-wide">
                 {result.verificationCode}
               </div>
               <div className="mt-1 text-[10px] text-gray-600">
                 {isPersisted
-                  ? '완료한 평가가 이 브라우저의 누적 기록에 추가되었습니다.'
-                  : '현재 화면에서는 확인할 수 있지만 새로고침하면 사라집니다. 브라우저 저장 설정을 확인해 주세요.'}
+                  ? '완료한 평가가 누적 기록에 추가되었습니다.'
+                  : '현재 화면에서는 확인할 수 있지만 새로고침하면 사라집니다. 저장 권한을 확인해 주세요.'}
               </div>
             </div>
             <div className="flex flex-col gap-2">

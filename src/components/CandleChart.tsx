@@ -76,7 +76,7 @@ export const CandleChart: React.FC<CandleChartProps> = ({
   });
 
   return (
-    <div className="w-full bg-white border border-black flex flex-col select-none">
+    <div className="w-full bg-white border border-black flex flex-col">
       {/* Chart Control and Information Header */}
       <div className="bg-[#E0E0E0] border-b border-black px-3 py-1.5 flex flex-wrap items-center justify-between gap-2 text-xs">
         <div className="flex items-center space-x-2 whitespace-nowrap">

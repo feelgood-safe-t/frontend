@@ -44,7 +44,7 @@ export const OmrSheetModal: React.FC<OmrSheetModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 select-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3">
       <div className="w-full max-w-2xl bg-[#F0F0F0] border-2 border-black flex flex-col">
         {/* Title Bar */}
         <div className="bg-[#004080] text-white px-3 py-1.5 flex items-center justify-between border-b border-black font-bold text-sm">

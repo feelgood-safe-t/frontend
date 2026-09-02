@@ -15,7 +15,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   onSelectDirection,
 }) => {
   return (
-    <div className="w-full bg-white border-t-2 border-black flex flex-col select-none shadow-[0_-3px_10px_rgba(0,0,0,0.12)]">
+    <div className="w-full bg-white border-t-2 border-black flex flex-col shadow-[0_-3px_10px_rgba(0,0,0,0.12)]">
       {/* Top Header Bar with CBT theme */}
       <div className="bg-[#004080] text-white px-4 py-1.5 font-bold text-xs flex items-center justify-between border-b border-black">
         <div className="flex items-center gap-3">
@@ -115,4 +115,3 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
     </div>
   );
 };
-

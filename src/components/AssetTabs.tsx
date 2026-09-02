@@ -31,7 +31,7 @@ export const AssetTabs: React.FC<AssetTabsProps> = ({
   ];
 
   return (
-    <div className="w-full bg-[#E0E0E0] border-b border-black pt-1.5 px-3 flex flex-wrap items-end gap-1 select-none shrink-0">
+    <div className="w-full bg-[#E0E0E0] border-b border-black pt-1.5 px-3 flex flex-wrap items-end gap-1 shrink-0">
       {tabs.map((tab) => {
         const isActive = currentTab === tab.id;
         const decision = decisions.find((d) => d.assetId === tab.id);

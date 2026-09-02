@@ -29,7 +29,7 @@ export const FinishExamModal: React.FC<FinishExamModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-3 select-none"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-3"
       role="dialog"
       aria-modal="true"
       aria-labelledby="finish-exam-title"

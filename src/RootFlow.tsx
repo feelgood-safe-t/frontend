@@ -127,7 +127,7 @@ export default function RootFlow() {
   const handleClearHistory = () => {
     if (!clearAssessmentResultHistory()) {
       window.alert(
-        '브라우저 평가 기록을 삭제하지 못했습니다. 사이트 저장 권한을 확인한 뒤 다시 시도해 주세요.',
+        '평가 기록을 삭제하지 못했습니다. 저장 권한을 확인한 뒤 다시 시도해 주세요.',
       );
       return;
     }

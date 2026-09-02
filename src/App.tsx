@@ -344,7 +344,7 @@ export default function App({
 
   return (
     <div
-      className={`h-screen max-h-screen overflow-hidden bg-[#F0F0F0] text-black flex flex-col font-gulim select-none ${
+      className={`h-screen max-h-screen overflow-hidden bg-[#F0F0F0] text-black flex flex-col font-gulim ${
         isLargeFont ? 'text-[13px]' : 'text-xs'
       }`}
     >

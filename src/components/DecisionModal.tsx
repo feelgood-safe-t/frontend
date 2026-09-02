@@ -113,7 +113,7 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 select-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3">
       {/* Rigid Window Dialog */}
       <div className="w-full max-w-lg bg-[#F0F0F0] border-2 border-black flex flex-col">
         {/* Title Bar */}

@@ -142,69 +142,63 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
           </div>
         </header>
 
-        <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-8 sm:py-12 flex items-center">
+        <main className="flex-1 w-full max-w-3xl mx-auto px-3 sm:px-4 pt-4 pb-8 sm:pt-8 sm:pb-12">
           <section className="w-full bg-white border-2 border-black" aria-labelledby="onboarding-title">
             <div className="bg-[#E0E0E0] border-b border-black px-4 py-2 text-xs font-bold flex justify-between">
               <span>평가 환경 설정</span>
               <span className="font-mono">FORM 01</span>
             </div>
 
-            <div className="p-5 sm:p-8">
-              <span className="inline-block bg-[#FFE600] border border-black px-2 py-1 text-[11px] font-black mb-3">
+            <div className="p-4 sm:p-6">
+              <span className="inline-block bg-[#FFE600] border border-black px-2 py-1 text-[11px] font-black mb-2 sm:mb-3">
                 시작 전 필수
               </span>
-              <h1 id="onboarding-title" className="text-2xl sm:text-3xl font-black tracking-tight">
+              <h1 id="onboarding-title" className="text-[22px] leading-tight sm:text-3xl font-black tracking-tight">
                 나에게 맞는 위험 대응 연습 설정
               </h1>
-              <p className="mt-3 text-sm sm:text-base text-gray-700 leading-relaxed">
-                투자 경험과 판단 습관을 알려주세요. 응답을 바탕으로 현재 목업에서 적합한 교육용
-                시뮬레이션을 자동으로 매칭합니다.
+              <p className="mt-2 sm:mt-3 text-sm sm:text-base text-gray-700 leading-relaxed">
+                투자 경험과 판단 습관에 답하면 적합한 6분 평가 시나리오를 매칭합니다.
               </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 border border-black mt-6 text-sm">
-                <div className="p-4 border-b sm:border-b-0 sm:border-r border-black bg-[#F8F9FA]">
+              <div className="grid grid-cols-3 border border-black mt-4 sm:mt-5 text-sm">
+                <div className="p-2.5 sm:p-4 border-r border-black bg-[#F8F9FA] text-center sm:text-left">
                   <div className="font-black text-[#004080]">10문항</div>
-                  <div className="text-xs text-gray-600 mt-1">모든 문항 필수 응답</div>
+                  <div className="hidden sm:block text-xs text-gray-600 mt-1">모든 문항 필수 응답</div>
                 </div>
-                <div className="p-4 border-b sm:border-b-0 sm:border-r border-black bg-[#F8F9FA]">
+                <div className="p-2.5 sm:p-4 border-r border-black bg-[#F8F9FA] text-center sm:text-left">
                   <div className="font-black text-[#004080]">약 1~2분</div>
-                  <div className="text-xs text-gray-600 mt-1">설문 시간 제한 없음</div>
+                  <div className="hidden sm:block text-xs text-gray-600 mt-1">설문 시간 제한 없음</div>
                 </div>
-                <div className="p-4 bg-[#F8F9FA]">
+                <div className="p-2.5 sm:p-4 bg-[#F8F9FA] text-center sm:text-left">
                   <div className="font-black text-[#004080]">정답 없음</div>
-                  <div className="text-xs text-gray-600 mt-1">실제 행동과 가깝게 응답</div>
+                  <div className="hidden sm:block text-xs text-gray-600 mt-1">실제 행동과 가깝게 응답</div>
                 </div>
               </div>
 
-              <div className="mt-5 border border-black bg-[#FFFBE6] p-3 text-xs leading-relaxed text-gray-800">
-                <div className="font-bold mb-1">응답 전 확인해 주세요.</div>
-                <p>
-                  이 설문은 교육용 시뮬레이션 설정을 위한 것으로 금융상품 적합성 평가나 투자 권유가
-                  아닙니다. 실제 자산·소득·부채 등 개인정보는 입력하지 마세요.
-                </p>
-                <p className="mt-1 text-gray-600">
-                  현재 응답은 서버로 전송하지 않습니다. 브라우저 저장소를 사용할 수 있는 경우 평가
-                  완료 후 누적 평가 이력에 추가되며, 이력 화면에서 직접 삭제할 수 있습니다.
-                </p>
+              <div className="mt-4 border border-black bg-[#FFFBE6] p-3 text-xs leading-relaxed text-gray-800">
+                <div className="font-bold mb-1">입력 안내</div>
+                <p>실제 자산·소득·부채 등 개인정보는 입력하지 마세요.</p>
               </div>
             </div>
 
-            <div className="bg-[#E0E0E0] border-t border-black px-4 py-3 flex flex-col-reverse sm:flex-row justify-between gap-2">
+            <div className="bg-[#E0E0E0] border-t border-black px-3 sm:px-4 py-3 flex items-center justify-between gap-2">
               {historyCount > 0 && onOpenHistory ? (
                 <button
                   type="button"
                   onClick={onOpenHistory}
-                  className="min-h-11 bg-white hover:bg-gray-100 text-black border-2 border-black px-5 py-2 text-sm font-bold cursor-pointer"
+                  className="min-h-11 bg-white hover:bg-gray-100 text-black border-2 border-black px-3 sm:px-5 py-2 text-xs sm:text-sm font-bold cursor-pointer"
                 >
-                  지난 평가 기록 {historyCount}건
+                  <span className="sm:hidden">기록 {historyCount}건</span>
+                  <span className="hidden sm:inline">지난 평가 기록 {historyCount}건</span>
                 </button>
               ) : <span />}
               <button
                 type="button"
                 onClick={() => setHasStarted(true)}
-                className="min-h-11 bg-[#004080] hover:bg-[#002B57] text-white border-2 border-black px-6 py-2 text-sm font-black cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#004080]"
+                className="min-h-11 bg-[#004080] hover:bg-[#002B57] text-white border-2 border-black px-4 sm:px-6 py-2 text-xs sm:text-sm font-black cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#004080]"
               >
-                설문 시작하기 →
+                <span className="sm:hidden">설문 시작 →</span>
+                <span className="hidden sm:inline">설문 시작하기 →</span>
               </button>
             </div>
           </section>

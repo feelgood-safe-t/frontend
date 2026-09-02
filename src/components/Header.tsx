@@ -35,7 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
   const isTimeLow = timeRemaining <= 60;
 
   return (
-    <header className="w-full bg-[#004080] text-white border-b-2 border-black select-none shrink-0">
+    <header className="w-full bg-[#004080] text-white border-b-2 border-black shrink-0">
       {/* Top Banner Row */}
       <div className="flex flex-wrap items-center justify-between px-3 py-1 border-b border-[#002b57] text-xs">
         <div className="flex items-center space-x-3">

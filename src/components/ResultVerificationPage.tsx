@@ -64,17 +64,17 @@ export const ResultVerificationPage: React.FC<ResultVerificationPageProps> = ({
     const title = isCodeMismatch
       ? '검증 코드가 일치하지 않습니다.'
       : resultStatus === 'unavailable'
-        ? '브라우저 저장소를 사용할 수 없습니다.'
+        ? '평가 기록 저장 기능을 사용할 수 없습니다.'
       : resultStatus === 'invalid'
         ? '저장된 결과를 읽을 수 없습니다.'
         : '저장된 평가 결과가 없습니다.';
     const description = isCodeMismatch
-      ? '입력한 검증 코드와 일치하는 결과가 이 브라우저의 평가 이력에 없습니다.'
+      ? '입력한 검증 코드와 일치하는 평가 이력이 없습니다.'
       : resultStatus === 'unavailable'
         ? '평가는 계속 진행할 수 있지만, 저장 권한이 차단된 동안에는 새로고침 후 결과 복원과 검증 코드 조회를 지원하지 않습니다.'
       : resultStatus === 'invalid'
         ? '결과 데이터가 손상되었거나 현재 버전에서 지원하지 않는 형식입니다.'
-        : '평가를 완료하면 이 브라우저에서 누적 결과를 확인할 수 있습니다.';
+        : '평가를 완료하면 누적 결과를 확인할 수 있습니다.';
 
     return (
       <div className="min-h-dvh bg-[#E7EBEF] font-gulim text-black flex flex-col">
@@ -161,7 +161,7 @@ export const ResultVerificationPage: React.FC<ResultVerificationPageProps> = ({
                 </h1>
               </div>
               <div className="text-xs sm:text-right">
-                <div className="font-black text-[#145C38]">이 브라우저의 평가 이력과 일치합니다.</div>
+                <div className="font-black text-[#145C38]">저장된 평가 이력과 일치합니다.</div>
                 <div className="mt-1 text-gray-600">완료 {formatDateTime(result.completedAt)}</div>
               </div>
             </div>

@@ -38,23 +38,23 @@ export const ScenarioMatchScreen: React.FC<ScenarioMatchScreenProps> = ({
     return (
       <div className="min-h-dvh bg-[#E7EBEF] text-black font-gulim flex flex-col">
         <header className="bg-[#004080] text-white border-b-2 border-black">
-          <div className="w-full max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+          <div className="w-full max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white text-[#004080] border-2 border-white font-black flex items-center justify-center text-sm">
+              <div className="w-8 h-8 bg-white text-[#004080] border border-white font-black flex items-center justify-center text-xs">
                 S:T
               </div>
               <div>
-                <div className="text-lg font-black">SAFE:T 위험 대응 평가</div>
+                <div className="text-base font-black">설문 응답 분석</div>
                 <div className="text-[11px] text-blue-100">교육 시나리오 자동 매칭</div>
               </div>
             </div>
-            <span className="hidden sm:inline border border-blue-200 bg-[#002B57] px-3 py-1 text-xs font-bold">
+            <span className="border border-blue-200 bg-[#002B57] px-3 py-1 text-xs font-bold">
               2단계 / 시나리오 설정
             </span>
           </div>
         </header>
 
-        <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-8 sm:py-12 flex items-center">
+        <main className="flex-1 w-full max-w-3xl mx-auto px-3 sm:px-4 pt-4 pb-8 sm:pt-8 sm:pb-12">
           <section
             className="w-full bg-white border-2 border-black"
             role="status"
@@ -67,16 +67,16 @@ export const ScenarioMatchScreen: React.FC<ScenarioMatchScreenProps> = ({
               <span className="font-mono">MATCHING</span>
             </div>
 
-            <div className="p-6 sm:p-9 text-center">
+            <div className="p-4 sm:p-7 text-center">
               <div
-                className="mx-auto h-12 w-12 border-4 border-[#B8C6D6] border-t-[#004080] animate-spin motion-reduce:animate-none"
+                className="mx-auto h-10 w-10 sm:h-12 sm:w-12 border-4 border-[#B8C6D6] border-t-[#004080] animate-spin motion-reduce:animate-none"
                 aria-hidden="true"
               />
               <h1
                 id="scenario-analysis-title"
                 ref={headingRef}
                 tabIndex={-1}
-                className="mt-5 text-xl sm:text-2xl font-black focus:outline-none"
+                className="mt-4 text-[20px] leading-tight sm:text-2xl font-black focus:outline-none"
               >
                 설문 응답을 분석하고 있습니다
               </h1>
@@ -84,18 +84,23 @@ export const ScenarioMatchScreen: React.FC<ScenarioMatchScreenProps> = ({
                 선택한 판단 습관과 학습 목표를 바탕으로 교육용 시나리오를 구성합니다.
               </p>
 
-              <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 border border-black text-xs text-left">
-                {['판단 성향 확인', '학습 초점 구성', '연습 자산 배정'].map((step, index) => (
+              <div className="mt-4 sm:mt-5 grid grid-cols-3 border border-black text-xs">
+                {[
+                  { label: '판단 성향 확인', compactLabel: '성향 확인' },
+                  { label: '학습 초점 구성', compactLabel: '초점 구성' },
+                  { label: '연습 자산 배정', compactLabel: '자산 배정' },
+                ].map((step, index) => (
                   <div
-                    key={step}
-                    className={`p-3 bg-[#F8F9FA] flex items-center gap-2 ${
-                      index < 2 ? 'border-b sm:border-b-0 sm:border-r border-black' : ''
+                    key={step.label}
+                    className={`min-h-[68px] p-2 sm:min-h-0 sm:p-3 bg-[#F8F9FA] flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1.5 sm:gap-2 text-center sm:text-left ${
+                      index < 2 ? 'border-r border-black' : ''
                     }`}
                   >
                     <span className="w-5 h-5 shrink-0 bg-[#004080] text-white font-mono font-black flex items-center justify-center">
                       {index + 1}
                     </span>
-                    <span className="font-bold">{step}</span>
+                    <span className="font-bold sm:hidden">{step.compactLabel}</span>
+                    <span className="hidden sm:inline font-bold">{step.label}</span>
                   </div>
                 ))}
               </div>

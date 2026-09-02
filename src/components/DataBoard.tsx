@@ -16,7 +16,7 @@ export const DataBoard: React.FC<DataBoardProps> = ({ metrics }) => {
   };
 
   return (
-    <div className="w-full bg-white border border-black flex flex-col select-none h-full">
+    <div className="w-full bg-white border border-black flex flex-col h-full">
       {/* Board Title Header */}
       <div className="bg-[#E0E0E0] text-black px-3 py-1.5 text-xs font-bold flex items-center justify-between border-b border-black shrink-0">
         <div className="flex items-center gap-2">
