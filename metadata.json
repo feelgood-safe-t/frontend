@@ -1,0 +1,6 @@
+{
+  "name": "Safe-T 투자 위험 대응 능력 평가 CBT",
+  "description": "국가공인 운전면허 학과시험 CBT 시스템 형식의 Safe-T 투자 위험 대응 능력 평가 캐주얼 판단 모드 웹 애플리케이션",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
