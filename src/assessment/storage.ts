@@ -90,10 +90,43 @@ export function readHistory(storage: Storage): RecordSnapshot[] {
 }
 export function saveRecord(storage: Storage, record: RecordSnapshot) {
   const previous = readHistory(storage);
+  const existing = previous.find((r) => r.id === record.id);
+  let merged = record;
+  if (existing) {
+    // Another tab may have acknowledged events that this tab never received.
+    // A later save must add to the immutable timeline, never replace it.
+    const eventIds = new Set<string>();
+    const requestIds = new Set<string>();
+    const events = [...existing.events, ...record.events].filter((entry) => {
+      // The backend scopes client event IDs by session and event type.
+      const requestId = `${entry.kind}:${entry.event.clientEventId}`;
+      const duplicate =
+        eventIds.has(entry.event.eventId) || requestIds.has(requestId);
+      eventIds.add(entry.event.eventId);
+      requestIds.add(requestId);
+      return !duplicate;
+    });
+    events.sort((a, b) => a.event.sequence - b.event.sequence);
+    const rank = { CREATED: 0, ACTIVE: 1, ENDED: 2, SNAPSHOT_READY: 3 };
+    const incomingIsNewer =
+      rank[record.session.status] > rank[existing.session.status] ||
+      (rank[record.session.status] === rank[existing.session.status] &&
+        Date.parse(record.session.serverNow) >
+          Date.parse(existing.session.serverNow));
+    const newer = incomingIsNewer ? record : existing;
+    const older = incomingIsNewer ? existing : record;
+    merged = {
+      ...newer,
+      survey: newer.survey ?? older.survey,
+      events,
+      itemInfo: { ...older.itemInfo, ...newer.itemInfo },
+    };
+  }
   storage.setItem(
     HISTORY_KEY,
-    JSON.stringify([record, ...previous.filter((r) => r.id !== record.id)]),
+    JSON.stringify([merged, ...previous.filter((r) => r.id !== record.id)]),
   );
+  return merged;
 }
 export interface LegacyRecord {
   id: string;

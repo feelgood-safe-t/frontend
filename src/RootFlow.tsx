@@ -82,6 +82,21 @@ export default function RootFlow() {
     [legacy, setLegacy] = useState<LegacyRecord[]>([]),
     [historyError, setHistoryError] = useState("");
   const session = runtime.session;
+  const examScreen =
+    location.pathname !== "/exam"
+      ? ""
+      : !state.restored
+        ? "restoring"
+        : session?.status === "ACTIVE"
+          ? session.currentItem?.assessmentItemId
+          : isSessionEnded(session?.status)
+            ? "submitted"
+            : session?.status;
+  useEffect(() => {
+    // Items and submission share /exam, so a route change alone is not enough.
+    // Keep ordinary timer updates and background sync from moving the viewport.
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [location.pathname, examScreen]);
   const home = () => {
     if (!busy) navigate("/");
   };

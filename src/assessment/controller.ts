@@ -32,6 +32,8 @@ export class AssessmentController {
   private state: State;
   private syncing: Promise<void> | null = null;
   private revision = 0;
+  private runtimeStorageError = "";
+  private historyStorageError = "";
   readonly runtimeKey: string;
   readonly mode: "api" | "demo";
   constructor(
@@ -75,15 +77,19 @@ export class AssessmentController {
   }
   private persist(update: Partial<Runtime>) {
     const runtime = { ...this.state.runtime, ...update };
-    let storageError = this.state.storageError;
     try {
       this.temporary.setItem(this.runtimeKey, JSON.stringify(runtime));
-      storageError = "";
+      this.runtimeStorageError = "";
     } catch {
-      storageError =
+      this.runtimeStorageError =
         "진행 정보를 저장하지 못했습니다. 저장 권한을 확인해 주세요.";
     }
-    this.patch({ runtime, storageError });
+    this.patch({ runtime, storageError: this.storageError() });
+  }
+  private storageError() {
+    return [this.runtimeStorageError, this.historyStorageError]
+      .filter(Boolean)
+      .join(" ");
   }
   private accept(session: Session) {
     if (
@@ -130,9 +136,9 @@ export class AssessmentController {
     this.patch({ receivedAt: Date.now(), restored: true });
     this.archive();
   }
-  private archive() {
+  private archive(): boolean {
     const r = this.state.runtime;
-    if (!r.session || !isSessionEnded(r.session.status)) return;
+    if (!r.session || !isSessionEnded(r.session.status)) return true;
     const record: RecordSnapshot = {
       id: r.session.assessmentSessionId,
       mode: this.mode,
@@ -142,12 +148,24 @@ export class AssessmentController {
       itemInfo: r.itemInfo,
     };
     try {
-      saveRecord(this.persistent, record);
+      const merged = saveRecord(this.persistent, record);
+      this.historyStorageError = "";
+      if (merged !== record) {
+        this.persist({
+          session: merged.session,
+          survey: merged.survey ?? undefined,
+          events: merged.events,
+          itemInfo: merged.itemInfo,
+        });
+      } else {
+        this.patch({ storageError: this.storageError() });
+      }
+      return true;
     } catch {
-      this.patch({
-        storageError:
-          "평가 기록을 저장하지 못했습니다. 현재 화면을 유지하고 다시 시도해 주세요.",
-      });
+      this.historyStorageError =
+        "평가 기록을 저장하지 못했습니다. 현재 화면을 유지하고 다시 시도해 주세요.";
+      this.patch({ storageError: this.storageError() });
+      return false;
     }
   }
   private async run(fn: () => Promise<void>) {
@@ -335,6 +353,8 @@ export class AssessmentController {
       this.patch({ error: "이전 요청의 처리 결과를 먼저 확인해 주세요." });
       return false;
     }
+    // Keep the last recoverable copy until the completed record is durable.
+    if (!this.archive()) return false;
     this.revision++;
     const participant = this.state.runtime.participant;
     this.patch({
@@ -352,6 +372,8 @@ export class AssessmentController {
       this.temporary.removeItem(this.runtimeKey);
       for (const key of [HISTORY_KEY, ...LEGACY_KEYS, DEMO_STORAGE_KEY])
         this.persistent.removeItem(key);
+      this.runtimeStorageError = "";
+      this.historyStorageError = "";
       this.patch({
         runtime: emptyRuntime(),
         busy: false,
