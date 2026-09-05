@@ -161,16 +161,16 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
                 나에게 맞는 위험 대응 연습 설정
               </h1>
               <p className="mt-2 sm:mt-3 text-sm sm:text-base text-gray-700 leading-relaxed">
-                투자 경험과 판단 습관에 답하면 적합한 6분 평가 시나리오를 매칭합니다.
+                투자 경험과 판단 습관을 바탕으로 나에게 맞는 평가 시나리오를 준비합니다.
               </p>
 
               <div className="grid grid-cols-3 border border-black mt-4 sm:mt-5 text-sm">
                 <div className="p-2.5 sm:p-4 border-r border-black bg-[#F8F9FA] text-center sm:text-left">
-                  <div className="font-black text-[#004080]">10문항</div>
+                  <div className="font-black text-[#004080]">{ONBOARDING_QUESTIONS.length}문항</div>
                   <div className="hidden sm:block text-xs text-gray-600 mt-1">모든 문항 필수 응답</div>
                 </div>
                 <div className="p-2.5 sm:p-4 border-r border-black bg-[#F8F9FA] text-center sm:text-left">
-                  <div className="font-black text-[#004080]">약 1~2분</div>
+                  <div className="font-black text-[#004080]">약 80초</div>
                   <div className="hidden sm:block text-xs text-gray-600 mt-1">설문 시간 제한 없음</div>
                 </div>
                 <div className="p-2.5 sm:p-4 bg-[#F8F9FA] text-center sm:text-left">
@@ -390,7 +390,7 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
                   onClick={handleComplete}
                   className="min-h-11 bg-[#177245] hover:bg-[#10552F] text-white border-2 border-black px-6 py-2 text-sm font-black cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#177245]"
                 >
-                  설문 완료 및 평가 시작
+                  설문 완료 →
                 </button>
               )}
             </div>
@@ -401,7 +401,7 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
       <footer className="bg-[#D4D0C8] border-t border-black px-4 py-1.5 text-[10px] text-gray-700">
         <div className="w-full max-w-6xl mx-auto flex flex-wrap justify-between gap-2">
           <span>SAFE:T 교육용 위험 대응 시뮬레이션</span>
-          <span>설문 완료 후 6분 평가가 시작됩니다.</span>
+          <span>설문을 마치면 평가 시나리오를 확인할 수 있습니다.</span>
         </div>
       </footer>
     </div>

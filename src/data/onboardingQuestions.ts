@@ -1,6 +1,8 @@
 import { OnboardingQuestion } from '../onboardingTypes';
 
-export const ONBOARDING_QUESTIONNAIRE_VERSION = 'questionnaire-safe-t-v2-frontend-draft';
+// 2026-09-04 확정 명세. API 연동 전까지 게시된 questionnaire v2와 동일한 문항을 사용한다.
+// https://github.com/feelgood-safe-t/docs/blob/main/03-survey/02-investor-profiling-questionnaire.md
+export const ONBOARDING_QUESTIONNAIRE_VERSION = 'questionnaire-safe-t-v2';
 
 export const ONBOARDING_QUESTIONS: OnboardingQuestion[] = [
   {
@@ -304,7 +306,7 @@ export const ONBOARDING_QUESTIONS: OnboardingQuestion[] = [
       {
         id: 'survey-q-learning-goal-o-record',
         label: '근거 중심 의사결정',
-        detail: '판단 이유를 명확히 기록하고 새로운 정보로 갱신하는 능력입니다.',
+        detail: '판단 이유를 명확히 기록하고 새로운 정보를 검토하는 능력입니다.',
       },
     ],
   },
