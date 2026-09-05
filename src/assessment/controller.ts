@@ -1,5 +1,10 @@
 import { ApiError, createApiGateway } from "./api";
-import { appendEvent, assertParticipantSafe, validateJudgment } from "./domain";
+import {
+  appendEvent,
+  assertParticipantSafe,
+  isSessionEnded,
+  validateJudgment,
+} from "./domain";
 import { createDemoGateway, DEMO_STORAGE_KEY } from "./demo";
 import {
   emptyRuntime,
@@ -83,7 +88,10 @@ export class AssessmentController {
   private accept(session: Session) {
     if (
       !session ||
-      !["CREATED", "ACTIVE", "ENDED"].includes(session.status) ||
+      !["CREATED", "ACTIVE", "ENDED", "SNAPSHOT_READY"].includes(
+        session.status,
+      ) ||
+      session.assessmentSessionId !== this.state.runtime.sessionId ||
       !Array.isArray(session.items) ||
       session.items.length !== 3 ||
       (session.status === "ACTIVE" &&
@@ -91,6 +99,27 @@ export class AssessmentController {
           !Number.isFinite(Date.parse(session.currentItem.deadlineAt))))
     )
       throw new Error("평가 진행 정보를 확인할 수 없습니다.");
+    const previous = this.state.runtime.session;
+    if (previous?.assessmentSessionId === session.assessmentSessionId) {
+      const rank = { CREATED: 0, ACTIVE: 1, ENDED: 2, SNAPSHOT_READY: 3 };
+      // An idempotent retry can return the original, older acknowledgment.
+      // Keep the latest known progress even if the subsequent refresh fails.
+      if (
+        rank[session.status] < rank[previous.status] ||
+        Date.parse(session.serverNow) < Date.parse(previous.serverNow) ||
+        (previous.currentItem &&
+          session.currentItem &&
+          (session.currentItem.ordinal < previous.currentItem.ordinal ||
+            (session.currentItem.ordinal === previous.currentItem.ordinal &&
+              session.currentItem.responseCount <
+                previous.currentItem.responseCount)))
+      ) {
+        assertParticipantSafe(previous, this.allowRaw);
+        this.patch({ restored: true });
+        this.archive();
+        return;
+      }
+    }
     assertParticipantSafe(session, this.allowRaw);
     const itemInfo = { ...this.state.runtime.itemInfo };
     if (session.currentItem) {
@@ -103,7 +132,7 @@ export class AssessmentController {
   }
   private archive() {
     const r = this.state.runtime;
-    if (r.session?.status !== "ENDED") return;
+    if (!r.session || !isSessionEnded(r.session.status)) return;
     const record: RecordSnapshot = {
       id: r.session.assessmentSessionId,
       mode: this.mode,
@@ -279,11 +308,15 @@ export class AssessmentController {
     });
   respond = (itemId: string, body: JudgmentInput) =>
     this.command({ kind: "respond", itemId, body: validateJudgment(body) });
-  view = (itemId: string, contentId: string) =>
+  view = (
+    itemId: string,
+    contentId: string,
+    clientEventId = crypto.randomUUID(),
+  ) =>
     this.command({
       kind: "view",
       itemId,
-      body: { contentId, clientEventId: crypto.randomUUID() },
+      body: { contentId, clientEventId },
     });
   complete = (itemId: string) =>
     this.command({ kind: "complete", itemId, key: crypto.randomUUID() });
@@ -297,7 +330,11 @@ export class AssessmentController {
         this.accept(await this.gateway.get(this.state.runtime.sessionId));
     });
   newAssessment = () => {
-    if (this.state.busy) return;
+    if (this.state.busy) return false;
+    if (this.state.runtime.pending) {
+      this.patch({ error: "이전 요청의 처리 결과를 먼저 확인해 주세요." });
+      return false;
+    }
     this.revision++;
     const participant = this.state.runtime.participant;
     this.patch({
@@ -306,6 +343,7 @@ export class AssessmentController {
       restored: true,
     });
     this.persist({});
+    return true;
   };
   reset = () => {
     if (this.state.busy) return;

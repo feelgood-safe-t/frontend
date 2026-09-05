@@ -47,10 +47,14 @@ export default function App({
   const item = session.currentItem!;
   const [now, setNow] = useState(Date.now()),
     [direction, setDirection] = useState<Direction | null>(null),
-    [news, setNews] = useState<News | null>(null),
+    [openedNews, setOpenedNews] = useState<{
+      content: News;
+      clientEventId: string;
+    } | null>(null),
     [showHistory, setShowHistory] = useState(false),
     [showRules, setShowRules] = useState(false),
     [finish, setFinish] = useState(false);
+  const news = openedNews?.content;
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(timer);
@@ -218,10 +222,12 @@ export default function App({
                   disabled={disabled}
                   className="text-left mt-2 font-bold text-sm underline underline-offset-4 min-h-11 disabled:opacity-40"
                   onClick={() => {
-                    setNews(content);
+                    const clientEventId = crypto.randomUUID();
+                    setOpenedNews({ content, clientEventId });
                     void controller.view(
                       item.assessmentItemId,
                       content.contentId,
+                      clientEventId,
                     );
                   }}
                 >
@@ -292,12 +298,39 @@ export default function App({
         />
       )}
       {news && (
-        <Dialog title="뉴스 상세" onClose={() => setNews(null)}>
+        <Dialog title="뉴스 상세" onClose={() => setOpenedNews(null)}>
           <p className="text-xs mb-3">
             {news.sourceLabel} · {marketLabel(news.marketOffsetMs)}
           </p>
           <h3 className="font-bold text-lg mb-3">{news.title}</h3>
           <p className="text-sm leading-7 whitespace-pre-wrap">{news.body}</p>
+          <div className="mt-4 border bg-gray-50 p-3 text-sm" role="status">
+            {pending ? (
+              <>
+                <p>
+                  {busy
+                    ? "열람 기록을 저장하고 있습니다."
+                    : "열람 기록의 저장 결과를 확인해 주세요."}
+                </p>
+                {!busy && (
+                  <button
+                    className={secondaryClass + " mt-2"}
+                    onClick={() => void controller.retry()}
+                  >
+                    저장 결과 확인
+                  </button>
+                )}
+              </>
+            ) : events.some(
+                (entry) =>
+                  entry.kind === "view" &&
+                  entry.event.clientEventId === openedNews?.clientEventId,
+              ) ? (
+              "열람 기록이 저장되었습니다."
+            ) : (
+              "열람 기록이 저장되지 않았습니다. 닫은 뒤 다시 열어 주세요."
+            )}
+          </div>
           <p className="border-t mt-4 pt-3 text-xs">
             {item.scenario.sourceState.mockRawSource
               ? "개발 검증용 콘텐츠"

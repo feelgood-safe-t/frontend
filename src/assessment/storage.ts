@@ -1,4 +1,5 @@
 import type { OnboardingSurveyResult } from "../onboardingTypes";
+import { isSessionEnded } from "./domain";
 import type {
   ItemInfo,
   JudgmentInput,
@@ -80,7 +81,7 @@ export function readHistory(storage: Storage): RecordSnapshot[] {
       (r) =>
         !r.id ||
         !r.session ||
-        r.session.status !== "ENDED" ||
+        !isSessionEnded(r.session.status) ||
         !Array.isArray(r.events),
     )
   )

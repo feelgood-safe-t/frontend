@@ -7,6 +7,10 @@ import type {
   TimelineEvent,
 } from "./types";
 
+// Snapshot readiness closes the assessment; it does not mean grading is complete.
+export const isSessionEnded = (status: Session["status"] | undefined) =>
+  status === "ENDED" || status === "SNAPSHOT_READY";
+
 export const REASON_LABELS: Record<ReasonTag, string> = {
   PRICE: "가격·차트",
   VOLUME: "거래량",

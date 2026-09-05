@@ -16,7 +16,11 @@ import {
   type LegacyRecord,
 } from "./assessment/storage";
 import type { RecordSnapshot } from "./assessment/types";
-import { CONFIDENCE_LABELS, REASON_LABELS } from "./assessment/domain";
+import {
+  CONFIDENCE_LABELS,
+  isSessionEnded,
+  REASON_LABELS,
+} from "./assessment/domain";
 import {
   AssessmentLayout,
   buttonClass,
@@ -89,7 +93,7 @@ export default function RootFlow() {
     } catch {
       setHistoryError("일부 평가 기록을 읽을 수 없습니다.");
     }
-  }, [location.pathname, session?.endedAt, runtime.events]);
+  }, [location.pathname, session?.endedAt, session?.status, runtime.events]);
   useEffect(() => {
     void controller.sync();
   }, [controller, runtime.sessionId]);
@@ -121,7 +125,7 @@ export default function RootFlow() {
   };
   const active = session?.status === "ACTIVE" || session?.status === "CREATED";
   const currentRecord: RecordSnapshot | undefined =
-    session?.status === "ENDED"
+    session && isSessionEnded(session.status)
       ? {
           id: session.assessmentSessionId,
           mode: controller.mode,
@@ -179,10 +183,14 @@ export default function RootFlow() {
             </button>
           ) : (
             <button
-              disabled={busy}
+              disabled={busy || Boolean(runtime.pending)}
               className={buttonClass}
               onClick={() => {
-                if (session?.status === "ENDED") controller.newAssessment();
+                if (
+                  isSessionEnded(session?.status) &&
+                  !controller.newAssessment()
+                )
+                  return;
                 void begin();
               }}
             >
@@ -331,7 +339,7 @@ export default function RootFlow() {
     </AssessmentLayout>
   );
   let exam;
-  if (runtime.sessionId && !state.restored)
+  if (runtime.sessionId && (!state.restored || !session))
     exam = (
       <AssessmentLayout onHome={home} mode={controller.mode}>
         <Panel title="진행 상태 확인">
@@ -372,8 +380,9 @@ export default function RootFlow() {
           </button>
           <button
             className={secondaryClass}
+            disabled={busy || Boolean(runtime.pending)}
             onClick={() => {
-              controller.newAssessment();
+              if (!controller.newAssessment()) return;
               void begin();
             }}
           >
@@ -399,7 +408,13 @@ export default function RootFlow() {
           className="border-b-2 border-red-700 bg-red-50 p-3 text-sm text-red-900 flex flex-wrap items-center justify-between gap-2"
           role="alert"
         >
-          <span>{error || storageError || "요청을 처리하고 있습니다."}</span>
+          <span>
+            {error ||
+              storageError ||
+              (busy
+                ? "요청을 처리하고 있습니다."
+                : "이전 요청의 저장 결과를 확인해 주세요.")}
+          </span>
           {!busy && runtime.sessionId && (
             <button
               className={secondaryClass}
@@ -415,7 +430,7 @@ export default function RootFlow() {
         <Route
           path="/survey"
           element={
-            runtime.questionnaire && !active ? (
+            runtime.questionnaire && !runtime.sessionId ? (
               <OnboardingSurvey
                 key={runtime.questionnaire.questionnaireVersionId}
                 startImmediately
@@ -433,7 +448,7 @@ export default function RootFlow() {
                 }}
               />
             ) : (
-              <Navigate to={active ? "/ready" : "/"} replace />
+              <Navigate to={runtime.sessionId ? "/exam" : "/"} replace />
             )
           }
         />

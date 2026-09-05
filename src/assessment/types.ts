@@ -80,7 +80,7 @@ export interface CurrentItem {
 }
 export interface Session {
   assessmentSessionId: string;
-  status: "CREATED" | "ACTIVE" | "ENDED";
+  status: "CREATED" | "ACTIVE" | "ENDED" | "SNAPSHOT_READY";
   questionCount: number;
   answeredQuestionCount: number;
   startedAt: string | null;
