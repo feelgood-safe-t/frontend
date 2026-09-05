@@ -1,470 +1,360 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useEffect, useState } from "react";
+import type { AssessmentController } from "./assessment/controller";
+import type {
+  Direction,
+  News,
+  Session,
+  TimelineEvent,
+} from "./assessment/types";
 import {
-  AssetCategory,
-  AssetData,
-  ConfidenceLevel,
-  DecisionRecord,
-  DirectionType,
-  ReasonCategory,
-} from './types';
-import { INITIAL_ASSETS } from './data/mockAssets';
-import { Header } from './components/Header';
-import { AssetTabs } from './components/AssetTabs';
-import { CandleChart } from './components/CandleChart';
-import { DataBoard } from './components/DataBoard';
-import { InfoFeedBBS } from './components/InfoFeedBBS';
-import { QuestionCard } from './components/QuestionCard';
-import { DecisionModal } from './components/DecisionModal';
-import { OmrSheetModal } from './components/OmrSheetModal';
-import { ExamNoticeModal } from './components/ExamNoticeModal';
-import { ResultReportModal } from './components/ResultReportModal';
-import { FinishExamModal } from './components/FinishExamModal';
-import { OnboardingSurveyResult } from './onboardingTypes';
-import { ScenarioMatchResult } from './scenarioTypes';
+  formatRemaining,
+  marketLabel,
+  timing,
+  visibleMarket,
+} from "./assessment/domain";
 import {
-  AssessmentResultSnapshot,
-  createAssessmentResult,
-  ExamFinishReason,
-  saveAssessmentResult,
-} from './assessmentResult';
+  AssessmentLayout,
+  buttonClass,
+  secondaryClass,
+  Dialog,
+  Panel,
+  Rules,
+} from "./components/AssessmentLayout";
+import { BehaviorTimeline } from "./components/BehaviorTimeline";
+import { MarketChart } from "./components/MarketChart";
+import { JudgmentDialog } from "./components/JudgmentDialog";
 
-const EXAM_DURATION_SECONDS = 6 * 60;
-
-const SCENARIO_SIMULATION_SETTINGS = {
-  기초: { volatilityScale: 0.7, tickIntervalMs: 1000 },
-  균형: { volatilityScale: 1, tickIntervalMs: 800 },
-  도전: { volatilityScale: 1.35, tickIntervalMs: 650 },
-} as const;
-
-const EXAM_QUESTIONS: {
-  id: AssetCategory;
-  questionNumber: number;
-  assetName: string;
-}[] = [
-  { id: 'normal', questionNumber: 1, assetName: INITIAL_ASSETS.normal.name },
-  { id: 'leverage', questionNumber: 2, assetName: INITIAL_ASSETS.leverage.name },
-  { id: 'stable', questionNumber: 3, assetName: INITIAL_ASSETS.stable.name },
-];
-
-interface AppProps {
-  onboardingResult: OnboardingSurveyResult;
-  scenarioMatch: ScenarioMatchResult;
-  onResultSaved: (result: AssessmentResultSnapshot, isPersisted: boolean) => void;
-  onOpenVerification: (result: AssessmentResultSnapshot) => void;
-  onOpenHistory: () => void;
-  onStartNewAssessment: () => void;
+interface Props {
+  controller: AssessmentController;
+  session: Session;
+  events: TimelineEvent[];
+  receivedAt: number;
+  busy: boolean;
+  pending: boolean;
+  error: string;
+  onHome: () => void;
 }
-
 export default function App({
-  onboardingResult,
-  scenarioMatch,
-  onResultSaved,
-  onOpenVerification,
-  onOpenHistory,
-  onStartNewAssessment,
-}: AppProps) {
-  // Candidate & Exam Info
-  const [candidateNumber] = useState<string>('KR-2026-8849-ANON');
-  const [terminalNumber] = useState<string>('04-B');
-  const [roomName] = useState<string>('제2CBT실기평가장');
-
-  // Exam Progress State
-  const [timeRemaining, setTimeRemaining] = useState<number>(EXAM_DURATION_SECONDS);
-  const [timerDeadline, setTimerDeadline] = useState<number>(
-    () => Date.now() + EXAM_DURATION_SECONDS * 1000,
-  );
-  const [currentTab, setCurrentTab] = useState<AssetCategory>('normal');
-  const [assets, setAssets] = useState<Record<AssetCategory, AssetData>>(INITIAL_ASSETS);
-  const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
-  const [tickCount, setTickCount] = useState<number>(1);
-  const [isSimulating, setIsSimulating] = useState<boolean>(true);
-  const [isLargeFont, setIsLargeFont] = useState<boolean>(false);
-
-  // Modals
-  const [isDecisionModalOpen, setIsDecisionModalOpen] = useState<boolean>(false);
-  const [pendingDirection, setPendingDirection] = useState<DirectionType>('UP');
-  const [isOmrOpen, setIsOmrOpen] = useState<boolean>(false);
-  const [isNoticeOpen, setIsNoticeOpen] = useState<boolean>(false);
-  const [isFinishConfirmOpen, setIsFinishConfirmOpen] = useState<boolean>(false);
-  const [isResultOpen, setIsResultOpen] = useState<boolean>(false);
-  const [resultSnapshot, setResultSnapshot] = useState<AssessmentResultSnapshot | null>(null);
-  const [isResultPersisted, setIsResultPersisted] = useState<boolean>(false);
-  const hasFinalizedRef = useRef(false);
-  const examStartedAtRef = useRef(Date.now());
-  const simulationSettings = SCENARIO_SIMULATION_SETTINGS[scenarioMatch.difficulty];
-
-  const finalizeExam = useCallback(
-    (finishReason: ExamFinishReason) => {
-      if (hasFinalizedRef.current) return;
-      hasFinalizedRef.current = true;
-
-      const snapshot = createAssessmentResult({
-        candidate: {
-          number: candidateNumber,
-          roomName,
-          terminalNumber,
-        },
-        decisions,
-        elapsedSeconds: Math.min(
-          EXAM_DURATION_SECONDS,
-          Math.max(0, Math.floor((Date.now() - examStartedAtRef.current) / 1000)),
-        ),
-        durationSeconds: EXAM_DURATION_SECONDS,
-        finishReason,
-        onboarding: onboardingResult,
-        scenario: scenarioMatch,
-      });
-
-      const isPersisted = saveAssessmentResult(snapshot);
-      setResultSnapshot(snapshot);
-      setIsResultPersisted(isPersisted);
-      onResultSaved(snapshot, isPersisted);
-      setIsSimulating(false);
-      setIsDecisionModalOpen(false);
-      setIsOmrOpen(false);
-      setIsNoticeOpen(false);
-      setIsFinishConfirmOpen(false);
-      setIsResultOpen(true);
-    }, [
-      candidateNumber,
-      decisions,
-      onboardingResult,
-      onResultSaved,
-      roomName,
-      scenarioMatch,
-      terminalNumber,
-    ],
-  );
-
-  // One deadline-based six-minute countdown for all three asset questions.
-  // Deriving the display from a deadline keeps the timer accurate after a
-  // background tab has throttled the interval.
+  controller,
+  session,
+  events,
+  receivedAt,
+  busy,
+  pending,
+  error,
+  onHome,
+}: Props) {
+  const item = session.currentItem!;
+  const [now, setNow] = useState(Date.now()),
+    [direction, setDirection] = useState<Direction | null>(null),
+    [news, setNews] = useState<News | null>(null),
+    [showHistory, setShowHistory] = useState(false),
+    [showRules, setShowRules] = useState(false),
+    [finish, setFinish] = useState(false);
   useEffect(() => {
-    if (isResultOpen) return;
-
-    const updateTimer = () => {
-      const nextRemaining = Math.max(0, Math.ceil((timerDeadline - Date.now()) / 1000));
-      setTimeRemaining(nextRemaining);
-
-      if (nextRemaining === 0) finalizeExam('TIMEOUT');
-    };
-
-    updateTimer();
-    const timer = window.setInterval(updateTimer, 250);
+    const timer = window.setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(timer);
-  }, [timerDeadline, isResultOpen, finalizeExam]);
-
-  // 60x Market Simulation Ticker (Ticks every 800ms)
-  const advanceMarketTick = useCallback(() => {
-    setTickCount((prevTick) => {
-      const nextTick = prevTick + 1;
-
-      setAssets((prev) => {
-        const updated: Record<AssetCategory, AssetData> = { ...prev };
-
-        (Object.keys(updated) as AssetCategory[]).forEach((cat) => {
-          const asset = updated[cat];
-          const candles = [...asset.candles];
-          const lastIndex = candles.length - 1;
-          const currentCandle = { ...candles[lastIndex] };
-
-          // Volatility multiplier by asset type
-          const baseVolatility =
-            cat === 'leverage' ? 0.004 : cat === 'stable' ? 0.0001 : 0.0012;
-          const volMultiplier = baseVolatility * simulationSettings.volatilityScale;
-          const delta = (Math.random() - 0.49) * volMultiplier * asset.basePrice;
-          const newClose = Math.round(currentCandle.close + delta);
-          const newHigh = Math.max(currentCandle.high, newClose);
-          const newLow = Math.min(currentCandle.low, newClose);
-          const addVolume = Math.floor(Math.random() * (cat === 'leverage' ? 8000 : 2000)) + 500;
-
-          currentCandle.close = newClose;
-          currentCandle.high = newHigh;
-          currentCandle.low = newLow;
-          currentCandle.volume += addVolume;
-
-          // If candle accumulated 6 ticks, push a new candle bar
-          if (nextTick % 6 === 0) {
-            const now = new Date();
-            const hour = String(now.getHours()).padStart(2, '0');
-            const minute = String(now.getMinutes()).padStart(2, '0');
-            const second = String(now.getSeconds()).padStart(2, '0');
-
-            candles[lastIndex] = currentCandle;
-            candles.push({
-              timestamp: now.toISOString(),
-              timeLabel: `${hour}:${minute}:${second}`,
-              open: newClose,
-              high: newClose,
-              low: newClose,
-              close: newClose,
-              volume: Math.floor(Math.random() * 1500) + 300,
-            });
-            if (candles.length > 40) {
-              candles.shift();
-            }
-          } else {
-            candles[lastIndex] = currentCandle;
-          }
-
-          // Update metrics
-          const priceDiff = newClose - asset.metrics.prevClose;
-          const changeRate = (priceDiff / asset.metrics.prevClose) * 100;
-          const newVol = asset.metrics.tradingVolume + addVolume;
-
-          updated[cat] = {
-            ...asset,
-            candles,
-            metrics: {
-              ...asset.metrics,
-              currentPrice: newClose,
-              change: priceDiff,
-              changeRate,
-              highPrice: Math.max(asset.metrics.highPrice, newHigh),
-              lowPrice: Math.min(asset.metrics.lowPrice, newLow),
-              tradingVolume: newVol,
-              foreignNet: asset.metrics.foreignNet + (cat === 'leverage' ? (Math.random() > 0.6 ? -120 : 60) : (Math.random() > 0.4 ? 80 : -40)),
-              rsi14: Math.min(85, Math.max(15, asset.metrics.rsi14 + (delta > 0 ? 0.3 : -0.3))),
-            },
-          };
-        });
-
-        return updated;
-      });
-
-      return nextTick;
-    });
-  }, [simulationSettings.volatilityScale]);
-
-  useEffect(() => {
-    if (!isSimulating || isResultOpen) return;
-    const interval = setInterval(advanceMarketTick, simulationSettings.tickIntervalMs);
-    return () => clearInterval(interval);
-  }, [isSimulating, isResultOpen, advanceMarketTick, simulationSettings.tickIntervalMs]);
-
-  // Open Decision Modal
-  const handleSelectDirection = (direction: DirectionType) => {
-    setPendingDirection(direction);
-    setIsDecisionModalOpen(true);
-  };
-
-  // Submit Answer to Decisions List
-  const handleDecisionSubmit = (data: {
-    direction: DirectionType;
-    confidence: ConfidenceLevel;
-    reasons: ReasonCategory[];
-    memo: string;
-  }) => {
-    const currentAsset = assets[currentTab];
-    const qNum = currentTab === 'normal' ? 1 : currentTab === 'leverage' ? 2 : 3;
-
-    const newRecord: DecisionRecord = {
-      id: `${currentTab}-${Date.now()}`,
-      questionNumber: qNum,
-      assetId: currentTab,
-      assetName: currentAsset.name,
-      decisionTime: new Date().toLocaleTimeString('ko-KR'),
-      direction: data.direction,
-      confidence: data.confidence,
-      reasons: data.reasons,
-      memo: data.memo,
-      priceAtDecision: currentAsset.metrics.currentPrice,
-      submittedAt: new Date().toISOString(),
-    };
-
-    setDecisions((prev) => {
-      const filtered = prev.filter((d) => d.assetId !== currentTab);
-      return [...filtered, newRecord];
-    });
-
-    // Auto navigate to next unanswered tab if available
-    const order: AssetCategory[] = ['normal', 'leverage', 'stable'];
-    const nextUnanswered = order.find((c) => c !== currentTab && !decisions.some((d) => d.assetId === c));
-    if (nextUnanswered) {
-      setTimeout(() => {
-        setCurrentTab(nextUnanswered);
-      }, 300);
-    }
-  };
-
-  const handleRequestFinish = () => {
-    if (isResultOpen || hasFinalizedRef.current) return;
-    setIsFinishConfirmOpen(true);
-  };
-
-  const handleConfirmFinish = () => {
-    finalizeExam('EARLY');
-  };
-
-  const handleRetakeSameAssessment = () => {
-    hasFinalizedRef.current = false;
-    examStartedAtRef.current = Date.now();
-    setDecisions([]);
-    setTimeRemaining(EXAM_DURATION_SECONDS);
-    setTimerDeadline(Date.now() + EXAM_DURATION_SECONDS * 1000);
-    setTickCount(1);
-    setIsSimulating(true);
-    setIsDecisionModalOpen(false);
-    setIsOmrOpen(false);
-    setIsNoticeOpen(false);
-    setIsFinishConfirmOpen(false);
-    setIsResultOpen(false);
-    setResultSnapshot(null);
-    setIsResultPersisted(false);
-    setCurrentTab('normal');
-    setAssets(INITIAL_ASSETS);
-  };
-
-  // Global Key Handler for standard modal escape
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
-        return;
-      }
-      if (e.key === 'Escape') {
-        setIsDecisionModalOpen(false);
-        setIsOmrOpen(false);
-        setIsNoticeOpen(false);
-        setIsFinishConfirmOpen(false);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
-
-  const currentAsset = assets[currentTab];
-  const currentDecision = decisions.find((d) => d.assetId === currentTab);
-  const qNum = currentTab === 'normal' ? 1 : currentTab === 'leverage' ? 2 : 3;
-  const answeredAssetIds = new Set(decisions.map((decision) => decision.assetId));
-  const answeredCount = EXAM_QUESTIONS.filter((question) => answeredAssetIds.has(question.id)).length;
-  const unansweredQuestions = EXAM_QUESTIONS.filter(
-    (question) => !answeredAssetIds.has(question.id),
+  const { remainingMs, marketOffsetMs } = timing(item, now - receivedAt),
+    expired = remainingMs === 0;
+  useEffect(() => {
+    if (expired) void controller.sync();
+  }, [expired, controller]);
+  const market = visibleMarket(item.scenario, marketOffsetMs),
+    last = market.candles.at(-1),
+    base =
+      item.scenario.candles.filter((c) => c.phase === "PRE_ROLL").at(-1)
+        ?.close ??
+      last?.open ??
+      1;
+  const change = last ? ((last.close - base) / base) * 100 : 0,
+    disabled = busy || pending || expired;
+  const judgments = events.filter(
+    (e) =>
+      e.kind === "judgment" &&
+      e.event.assessmentItemId === item.assessmentItemId,
   );
-
   return (
-    <div
-      className={`h-screen max-h-screen overflow-hidden bg-[#F0F0F0] text-black flex flex-col font-gulim ${
-        isLargeFont ? 'text-[13px]' : 'text-xs'
-      }`}
+    <AssessmentLayout
+      onHome={onHome}
+      mode={controller.mode}
+      actions={
+        <>
+          <button
+            className="border border-white px-3 py-2 text-sm"
+            onClick={() => setShowRules(true)}
+          >
+            평가 안내
+          </button>
+          <button
+            className="border border-white px-3 py-2 text-sm"
+            onClick={() => setShowHistory(true)}
+          >
+            판단 기록
+          </button>
+        </>
+      }
     >
-      {/* 1. Official CBT Header (Fixed) */}
-      <Header
-        timeRemaining={timeRemaining}
-        candidateNumber={candidateNumber}
-        terminalNumber={terminalNumber}
-        roomName={roomName}
-        scenarioName={scenarioMatch.name}
-        answeredCount={answeredCount}
-        totalQuestions={EXAM_QUESTIONS.length}
-        onOpenNotice={() => setIsNoticeOpen(true)}
-        onOpenOmr={() => setIsOmrOpen(true)}
-        onFinishExam={handleRequestFinish}
-        isLargeFont={isLargeFont}
-        onToggleFontSize={() => setIsLargeFont(!isLargeFont)}
-      />
-
-      {/* 2. Windows Folder-Type Asset Navigation Tabs (Fixed) */}
-      <AssetTabs
-        currentTab={currentTab}
-        onSelectTab={(tab) => setCurrentTab(tab)}
-        decisions={decisions}
-      />
-
-      <div className="shrink-0 border-b border-black bg-[#FFFBE6] px-3 py-1 text-[11px] flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-        <span>
-          <strong>{scenarioMatch.difficulty} 과정</strong> · {scenarioMatch.focusAreas.join(' · ')}
-        </span>
-        <span className="font-mono text-gray-600">
-          MOCK SIMULATION · {simulationSettings.volatilityScale.toFixed(2)}x 변동 강도
-        </span>
+      <section className="sticky top-0 z-20 border-2 border-black bg-white px-3 py-3 flex flex-wrap justify-between gap-3 items-center">
+        <div>
+          <p className="text-xs text-gray-600">현재 문항 {item.ordinal} / 3</p>
+          <h1 className="font-black text-xl">
+            {item.scenario.asset.displayName}
+          </h1>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <p className="text-xs">문항 남은 시간</p>
+            <strong
+              className={`font-mono text-2xl ${remainingMs <= 30000 ? "text-red-700" : "text-blue-900"}`}
+              role="timer"
+            >
+              {formatRemaining(remainingMs)}
+            </strong>
+          </div>
+          <button
+            className={secondaryClass}
+            disabled={busy || pending}
+            onClick={() => setFinish(true)}
+          >
+            시험 종료
+          </button>
+        </div>
+      </section>
+      <ol aria-label="문항 진행 상태" className="grid grid-cols-3 gap-2">
+        {session.items.map((i) => (
+          <li
+            key={i.assessmentItemId}
+            aria-current={i.status === "ACTIVE" ? "step" : undefined}
+            className={`border p-3 text-sm ${i.status === "ACTIVE" ? "border-blue-800 bg-blue-50 font-bold" : "border-gray-400 bg-white text-gray-600"}`}
+          >
+            문항 {i.ordinal}
+            <span className="block text-xs mt-1">
+              {i.status === "LOCKED"
+                ? "🔒 시작 전"
+                : i.status === "ACTIVE"
+                  ? `진행 중 · 판단 ${i.responseCount}회`
+                  : i.answerStatus === "ANSWERED"
+                    ? "완료"
+                    : "미응답 종료"}
+            </span>
+          </li>
+        ))}
+      </ol>
+      {item.scenario.sourceState.mockRawSource && (
+        <p className="text-xs border bg-yellow-50 p-3">
+          개발 검증용 원천 데이터 · 공개 배포 시에는 표시되지 않습니다.
+        </p>
+      )}
+      <Panel title={item.scenario.brief.title}>
+        <p className="text-sm leading-relaxed">{item.scenario.brief.summary}</p>
+      </Panel>
+      <div className="grid lg:grid-cols-[minmax(0,2fr)_minmax(230px,1fr)] gap-4">
+        <Panel title={`가격 흐름 · ${marketLabel(marketOffsetMs)} · 60배속`}>
+          <MarketChart candles={market.candles} />
+        </Panel>
+        <Panel title="공개 구간 요약">
+          <dl className="divide-y divide-gray-200 text-sm">
+            {[
+              ["현재가", last?.close.toFixed(3) ?? "—"],
+              ["시작 기준가", base.toFixed(3)],
+              ["시작 대비", `${change > 0 ? "+" : ""}${change.toFixed(2)}%`],
+              [
+                "공개 구간 고가",
+                market.candles.length
+                  ? Math.max(...market.candles.map((c) => c.high)).toFixed(3)
+                  : "—",
+              ],
+              [
+                "공개 구간 저가",
+                market.candles.length
+                  ? Math.min(...market.candles.map((c) => c.low)).toFixed(3)
+                  : "—",
+              ],
+              [
+                "공개 구간 거래량",
+                market.candles
+                  .reduce((sum, c) => sum + c.volume, 0)
+                  .toLocaleString(undefined, { maximumFractionDigits: 2 }),
+              ],
+            ].map(([label, value]) => (
+              <div key={label} className="py-3 flex justify-between gap-2">
+                <dt>{label}</dt>
+                <dd className="font-mono font-bold">{value}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="text-xs text-gray-600 mt-3">
+            {item.scenario.asset.priceScale === "RAW_MOCK"
+              ? "개발용 가격"
+              : "정규화 가격"}{" "}
+            · 미래 구간은 표시되지 않습니다.
+          </p>
+        </Panel>
       </div>
-
-      {/* 3. Main Examination Workspace: Internal Vertical Scroll Area (No horizontal scroll) */}
-      <main className="flex-1 w-full overflow-y-auto overflow-x-hidden p-2.5 max-w-[1680px] mx-auto flex flex-col gap-2.5">
-        {/* Top Split Area: Candle Chart (Left) + Market Data Board (Right) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5 items-stretch w-full">
-          {/* Left: Candlestick Chart */}
-          <div className="lg:col-span-7 flex flex-col w-full min-w-0">
-            <CandleChart
-              asset={currentAsset}
-              candles={currentAsset.candles}
-              tickCount={tickCount}
-              isSimulating={isSimulating}
-              onToggleSimulation={() => setIsSimulating(!isSimulating)}
-              onManualTick={advanceMarketTick}
-            />
-          </div>
-
-          {/* Right: Dense Market Data Board */}
-          <div className="lg:col-span-5 flex flex-col w-full min-w-0">
-            <DataBoard metrics={currentAsset.metrics} assetName={currentAsset.name} />
-          </div>
+      <Panel title="공시·뉴스">
+        <p className="text-xs text-gray-600 mb-3">
+          목록을 보는 것과 상세 내용을 여는 것은 구분하여 기록합니다.
+        </p>
+        {market.news.length ? (
+          <ul className="space-y-2">
+            {market.news.map((content) => (
+              <li
+                key={content.contentId}
+                className="border border-gray-400 p-3"
+              >
+                <div className="flex flex-wrap justify-between gap-2 text-xs text-gray-600">
+                  <span>
+                    {content.sourceLabel} ·{" "}
+                    {marketLabel(content.marketOffsetMs)}
+                  </span>
+                  <span className="border border-blue-300 bg-blue-50 text-blue-900 px-2 py-1">
+                    {item.scenario.sourceState.mockRawSource
+                      ? "개발 검증용 콘텐츠"
+                      : "AI 가명화·재작성 시뮬레이션 콘텐츠"}
+                  </span>
+                </div>
+                <button
+                  disabled={disabled}
+                  className="text-left mt-2 font-bold text-sm underline underline-offset-4 min-h-11 disabled:opacity-40"
+                  onClick={() => {
+                    setNews(content);
+                    void controller.view(
+                      item.assessmentItemId,
+                      content.contentId,
+                    );
+                  }}
+                >
+                  {content.title} →
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm">아직 공개된 뉴스가 없습니다.</p>
+        )}
+      </Panel>
+      <section className="sticky bottom-0 border-2 border-black bg-white p-3 sm:p-4 z-20">
+        <div className="flex flex-wrap justify-between gap-2 text-sm mb-3">
+          <p>
+            현재까지 판단{" "}
+            <strong>{Math.max(item.responseCount, judgments.length)}회</strong>
+            {item.latestDirection &&
+              ` · 최근 ${item.latestDirection === "UP" ? "▲ 상승" : "▼ 하락"}`}
+          </p>
+          <span className="text-gray-600">
+            새 정보를 확인하고 판단을 추가할 수 있습니다.
+          </span>
         </div>
-
-        {/* Middle Area: Official Information Feed (BBS) */}
-        <div className="w-full min-w-0">
-          <InfoFeedBBS bbsList={currentAsset.bbsList} assetName={currentAsset.name} />
+        <div className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_auto] gap-2">
+          <button
+            disabled={disabled}
+            onClick={() => setDirection("UP")}
+            className={secondaryClass + " !bg-red-50 !text-red-800"}
+          >
+            ▲ 상승 판단
+          </button>
+          <button
+            disabled={disabled}
+            onClick={() => setDirection("DOWN")}
+            className={secondaryClass + " !bg-blue-50 !text-blue-900"}
+          >
+            ▼ 하락 판단
+          </button>
+          <button
+            disabled={disabled || !item.scoreEligible}
+            onClick={() => void controller.complete(item.assessmentItemId)}
+            className={buttonClass + " col-span-2 sm:col-span-1"}
+          >
+            {item.ordinal === 3 ? "문항 완료·평가 제출" : "문항 완료 / 다음 →"}
+          </button>
         </div>
-      </main>
-
-      {/* 4. Fixed Bottom CBT Question Console (Unified full-width standalone bar) */}
-      <footer className="w-full shrink-0 z-20">
-        <QuestionCard
-          asset={currentAsset}
-          questionNumber={qNum}
-          currentDecision={currentDecision}
-          onSelectDirection={handleSelectDirection}
+        {!item.scoreEligible && (
+          <p className="text-xs text-gray-600 mt-2">
+            판단을 한 번 이상 기록하면 문항을 완료할 수 있습니다.
+          </p>
+        )}
+        {expired && (
+          <p role="status" className="text-sm mt-2">
+            시간이 만료되어 다음 진행 상태를 확인하고 있습니다.
+          </p>
+        )}
+      </section>
+      {direction && (
+        <JudgmentDialog
+          direction={direction}
+          item={item}
+          controller={controller}
+          busy={busy}
+          pending={pending}
+          error={error}
+          onClose={() => setDirection(null)}
         />
-      </footer>
-
-      {/* 3. Decision Recording Modal */}
-      <DecisionModal
-        isOpen={isDecisionModalOpen}
-        onClose={() => setIsDecisionModalOpen(false)}
-        direction={pendingDirection}
-        asset={currentAsset}
-        onSubmit={handleDecisionSubmit}
-      />
-
-      {/* 4. OMR Answer Sheet Modal */}
-      <OmrSheetModal
-        isOpen={isOmrOpen}
-        onClose={() => setIsOmrOpen(false)}
-        decisions={decisions}
-        onSelectQuestion={(cat) => setCurrentTab(cat)}
-        onFinishExam={handleRequestFinish}
-      />
-
-      {/* 5. Exam Notice Modal */}
-      <ExamNoticeModal
-        isOpen={isNoticeOpen}
-        onClose={() => setIsNoticeOpen(false)}
-        scenario={scenarioMatch}
-      />
-
-      {/* 6. Manual Finish Confirmation (timer expiry bypasses this dialog) */}
-      <FinishExamModal
-        isOpen={isFinishConfirmOpen}
-        answeredCount={answeredCount}
-        totalQuestions={EXAM_QUESTIONS.length}
-        unansweredQuestions={unansweredQuestions}
-        onCancel={() => setIsFinishConfirmOpen(false)}
-        onConfirm={handleConfirmFinish}
-      />
-
-      {/* 7. Final CBT Scorecard & Pass Certificate Modal */}
-      <ResultReportModal
-        isOpen={isResultOpen}
-        result={resultSnapshot}
-        isPersisted={isResultPersisted}
-        onOpenVerification={() => {
-          if (resultSnapshot && isResultPersisted) onOpenVerification(resultSnapshot);
-        }}
-        onOpenHistory={onOpenHistory}
-        onRetakeSame={handleRetakeSameAssessment}
-        onStartNew={onStartNewAssessment}
-      />
-    </div>
+      )}
+      {news && (
+        <Dialog title="뉴스 상세" onClose={() => setNews(null)}>
+          <p className="text-xs mb-3">
+            {news.sourceLabel} · {marketLabel(news.marketOffsetMs)}
+          </p>
+          <h3 className="font-bold text-lg mb-3">{news.title}</h3>
+          <p className="text-sm leading-7 whitespace-pre-wrap">{news.body}</p>
+          <p className="border-t mt-4 pt-3 text-xs">
+            {item.scenario.sourceState.mockRawSource
+              ? "개발 검증용 콘텐츠"
+              : "AI 가명화·재작성 시뮬레이션 콘텐츠"}
+          </p>
+        </Dialog>
+      )}
+      {showHistory && (
+        <Dialog
+          title="전체 판단·열람 기록"
+          onClose={() => setShowHistory(false)}
+        >
+          <BehaviorTimeline events={events} session={session} />
+        </Dialog>
+      )}
+      {showRules && (
+        <Dialog title="평가 안내" onClose={() => setShowRules(false)}>
+          <Rules />
+        </Dialog>
+      )}
+      {finish && (
+        <Dialog
+          title="시험 종료"
+          onClose={() => setFinish(false)}
+          locked={busy}
+        >
+          <p className="text-sm leading-7">
+            지금 종료하면 응답한 문항은 평가 대상으로 남고, 미응답 문항은 0점
+            처리됩니다. 종료 자체에 별도 감점은 없습니다. 종료 후에는 판단을
+            추가할 수 없습니다.
+          </p>
+          <ul className="my-4 text-sm space-y-2">
+            {session.items.map((i) => (
+              <li key={i.assessmentItemId}>
+                문항 {i.ordinal} ·{" "}
+                {i.responseCount ? `판단 ${i.responseCount}회` : "미응답"}
+              </li>
+            ))}
+          </ul>
+          <div className="flex justify-end gap-2">
+            <button
+              disabled={busy}
+              className={secondaryClass}
+              onClick={() => setFinish(false)}
+            >
+              계속 응시
+            </button>
+            <button
+              disabled={busy || pending}
+              className={buttonClass}
+              onClick={() => void controller.finish(item.assessmentItemId)}
+            >
+              제출 및 종료
+            </button>
+          </div>
+        </Dialog>
+      )}
+    </AssessmentLayout>
   );
 }
