@@ -13,7 +13,7 @@ export interface Questionnaire {
 }
 export interface Participant {
   participantId: string;
-  accessToken: string;
+  accessToken?: string;
 }
 export interface Candle {
   barId: string;

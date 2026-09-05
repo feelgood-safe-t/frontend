@@ -61,8 +61,16 @@ export function createApiGateway(
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
       const headers: Record<string, string> = {};
-      if (!guest && credentials())
-        headers.Authorization = `Bearer ${credentials()!.accessToken}`;
+      const participant = guest ? undefined : credentials();
+      if (participant?.participantId) {
+        // Record identity for local no-auth mode; not a secret or an authorization grant.
+        headers["X-Participant-Id"] = participant.participantId;
+        if (
+          typeof participant.accessToken === "string" &&
+          participant.accessToken.trim()
+        )
+          headers.Authorization = `Bearer ${participant.accessToken}`;
+      }
       if (body !== undefined) headers["Content-Type"] = "application/json";
       if (key) headers["Idempotency-Key"] = key;
       const response = await fetcher(base + path, {
@@ -92,8 +100,25 @@ export function createApiGateway(
   const itemPath = (id: string, itemId: string) =>
     `${sessionPath(id)}/items/${encodeURIComponent(itemId)}`;
   return {
-    guest: () =>
-      request("/v1/participants/guest", "POST", undefined, undefined, true),
+    async guest() {
+      const participant = await request<Participant>(
+        "/v1/participants/guest",
+        "POST",
+        undefined,
+        undefined,
+        true,
+      );
+      if (
+        typeof participant.participantId !== "string" ||
+        !participant.participantId.trim() ||
+        participant.participantId !== participant.participantId.trim() ||
+        participant.participantId.length > 200 ||
+        (participant.accessToken !== undefined &&
+          typeof participant.accessToken !== "string")
+      )
+        throw new ApiError(502, "INVALID_PARTICIPANT");
+      return participant;
+    },
     async questionnaire() {
       const raw = await request<{
         questionnaireVersionId: string;

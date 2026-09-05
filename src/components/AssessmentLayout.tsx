@@ -30,7 +30,7 @@ export function AssessmentLayout({
       </main>
       <footer className="border-t border-black bg-[#D4D0C8] px-4 py-3 text-xs">
         <div className="max-w-6xl mx-auto flex flex-wrap justify-between gap-2">
-          <span>Safe-T · 투자 추천이 아닌 교육용 시뮬레이션</span>
+          <span>청노 · 투자 추천이 아닌 교육용 시뮬레이션</span>
           {mode === "demo" && <span>데모 · 고정 예시 데이터</span>}
         </div>
       </footer>

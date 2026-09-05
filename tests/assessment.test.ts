@@ -279,6 +279,8 @@ test("API uses bearer, scalar/multi survey values, singular response path and id
     calls.push({ url: String(input), init: init! });
     return new Response(
       JSON.stringify({
+        participantId: "p",
+        accessToken: "token",
         surveySubmissionId: "survey",
         assessmentSessionId: "session",
       }),

@@ -491,7 +491,7 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
 
       <footer className="bg-[#D4D0C8] border-t border-black px-4 py-1.5 text-[10px] text-gray-700">
         <div className="w-full max-w-6xl mx-auto flex flex-wrap justify-between gap-2">
-          <span>SAFE:T 교육용 위험 대응 시뮬레이션</span>
+          <span>청노 교육용 위험 대응 시뮬레이션</span>
           <span>설문을 마치면 평가 시나리오를 확인할 수 있습니다.</span>
         </div>
       </footer>

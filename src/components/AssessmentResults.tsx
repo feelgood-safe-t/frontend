@@ -232,7 +232,7 @@ export function SampleReport() {
             인증 코드 SAMPLE-L1 · 발급일 및 검증 주소는 실제 발급 시 제공됩니다.
           </p>
           <p className="mt-5 text-xs leading-6">
-            본 인증은 Safe-T가 발급하는 자체 교육 인증이며, 공인 금융 자격 또는
+            본 인증은 청노가 발급하는 자체 교육 인증이며, 공인 금융 자격 또는
             실제 투자 적격성을 의미하지 않습니다.
           </p>
         </div>
