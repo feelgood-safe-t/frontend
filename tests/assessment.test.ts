@@ -1,11 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createDemoGateway, demoScenario } from "../src/assessment/demo";
-import {
-  ApiError,
-  createApiGateway,
-  surveyPayload,
-} from "../src/assessment/api";
+import { toSurveyInput } from "../src/assessment/pocApi";
+import { ApiError } from "../src/assessment/api";
 import { AssessmentController } from "../src/assessment/controller";
 import {
   RUBRIC,
@@ -273,40 +270,8 @@ test("production rejects raw and unmarked source data; local development can ins
   session.currentItem!.scenario.sourceState = undefined as never;
   assert.throws(() => assertParticipantSafe(session, false));
 });
-test("API uses bearer, scalar/multi survey values, singular response path and idempotency headers", async () => {
-  const calls: { url: string; init: RequestInit }[] = [];
-  const f: typeof fetch = async (input, init) => {
-    calls.push({ url: String(input), init: init! });
-    return new Response(
-      JSON.stringify({
-        participantId: "p",
-        accessToken: "token",
-        surveySubmissionId: "survey",
-        assessmentSessionId: "session",
-      }),
-      { status: 200 },
-    );
-  };
-  const g = createApiGateway(
-    "https://example.test/",
-    () => ({ participantId: "p", accessToken: "token" }),
-    f,
-  );
-  await g.guest();
-  assert.equal(
-    (calls[0].init.headers as Record<string, string>).Authorization,
-    undefined,
-  );
-  await g.survey(survey, ONBOARDING_QUESTIONS, "survey-key");
-  assert.equal(
-    (calls[1].init.headers as Record<string, string>).Authorization,
-    "Bearer token",
-  );
-  assert.equal(
-    (calls[1].init.headers as Record<string, string>)["Idempotency-Key"],
-    "survey-key",
-  );
-  const payload = surveyPayload(survey, ONBOARDING_QUESTIONS);
+test("survey submission uses scalar and multi-choice values without identity", () => {
+  const payload = toSurveyInput(survey, ONBOARDING_QUESTIONS);
   payload.answers.forEach((a) =>
     assert.equal(
       Array.isArray(a.value),
@@ -314,157 +279,10 @@ test("API uses bearer, scalar/multi survey values, singular response path and id
         "MULTI_CHOICE",
     ),
   );
-  await g.respond("session", "item", answer());
-  assert.ok(calls[2].url.endsWith("/items/item/response"));
-  await g.finish("session", "item", "finish-key");
-  assert.deepEqual(JSON.parse(calls[3].init.body as string), {
-    expectedCurrentItemId: "item",
-  });
-});
-test("API failures surface without mock fallback", async () => {
-  const g = createApiGateway(
-    "https://example.test",
-    () => undefined,
-    async () =>
-      new Response(JSON.stringify({ error: { code: "UNAUTHORIZED" } }), {
-        status: 401,
-      }),
-  );
-  await assert.rejects(
-    g.questionnaire(),
-    (e) => e instanceof ApiError && e.status === 401,
-  );
-});
-
-function apiHarness() {
-  const persistent = new MemoryStorage(),
-    temporary = new MemoryStorage(),
-    demo = createDemoGateway(new MemoryStorage());
-  let loseResponse = false,
-    failRefresh = false,
-    delayGet = false,
-    releaseGet: (() => void) | undefined;
-  const fetcher: typeof fetch = async (input, init) => {
-    const path = new URL(String(input)).pathname,
-      body = init?.body ? JSON.parse(init.body as string) : undefined;
-    const key = (init?.headers as Record<string, string>)?.["Idempotency-Key"];
-    const parts = path.split("/"),
-      id = parts[3],
-      itemId = parts[5];
-    let value: unknown;
-    if (path.endsWith("/guest")) value = await demo.guest();
-    else if (path.endsWith("/current")) {
-      const q = await demo.questionnaire();
-      value = {
-        ...q,
-        questions: q.questions.map(({ id, options, ...rest }) => ({
-          ...rest,
-          questionId: id,
-          options: options.map((o, index) => ({
-            ...o,
-            optionId: o.id,
-            displayOrder: index,
-          })),
-        })),
-      };
-    } else if (path.endsWith("/survey-submissions"))
-      value = { surveySubmissionId: "survey" };
-    else if (path === "/v1/assessment-sessions")
-      value = {
-        assessmentSessionId: await demo.create(body.surveySubmissionId, key),
-      };
-    else if (path.endsWith("/start")) value = await demo.start(id);
-    else if (path.endsWith("/response")) {
-      value = await demo.respond(id, itemId, body);
-      if (loseResponse) {
-        loseResponse = false;
-        throw new Error("lost acknowledgement");
-      }
-    } else if (path.endsWith("/finish"))
-      value = await demo.finish(id, body.expectedCurrentItemId, key);
-    else {
-      if (failRefresh) {
-        failRefresh = false;
-        throw new Error("offline");
-      }
-      value = await demo.get(id);
-      if (delayGet) {
-        delayGet = false;
-        await new Promise<void>((r) => (releaseGet = r));
-      }
-    }
-    return new Response(JSON.stringify(value), { status: 200 });
-  };
-  const controller = () =>
-    new AssessmentController(
-      "https://example.test",
-      temporary,
-      persistent,
-      false,
-      fetcher,
-    );
-  return {
-    persistent,
-    temporary,
-    controller,
-    lose: () => (loseResponse = true),
-    fail: () => (failRefresh = true),
-    delay: () => (delayGet = true),
-    release: () => releaseGet?.(),
-  };
-}
-async function begin(c: AssessmentController) {
-  assert.equal(await c.begin(), true);
-  assert.equal(await c.submit(survey), true);
-  assert.equal(await c.start(), true);
-  return c.getSnapshot().runtime.session!.currentItem!.assessmentItemId;
-}
-test("lost acknowledgment survives refresh and retries same event without duplication", async () => {
-  const h = apiHarness(),
-    c = h.controller(),
-    item = await begin(c),
-    input = answer();
-  h.lose();
-  assert.equal(await c.respond(item, input), false);
-  assert.ok(c.getSnapshot().runtime.pending);
-  const restored = h.controller();
-  await restored.sync();
-  assert.equal(
-    restored.getSnapshot().runtime.session!.currentItem!.responseCount,
-    1,
-  );
-  assert.equal(await restored.retry(), true);
-  assert.equal(restored.getSnapshot().runtime.events.length, 1);
-  assert.equal(restored.getSnapshot().runtime.pending, undefined);
-  assert.equal(await restored.finish(item), true);
-  const records = readHistory(h.persistent);
-  assert.equal(records.length, 1);
-  assert.equal(records[0].events.length, 1);
-  await restored.sync();
-  assert.equal(readHistory(h.persistent).length, 1);
-});
-test("acknowledged event remains stored even if following refresh fails", async () => {
-  const h = apiHarness(),
-    c = h.controller(),
-    item = await begin(c);
-  h.fail();
-  assert.equal(await c.respond(item, answer()), false);
-  assert.equal(c.getSnapshot().runtime.events.length, 1);
-  assert.equal(c.getSnapshot().runtime.pending, undefined);
-  await c.retry();
-  assert.equal(c.getSnapshot().runtime.session!.currentItem!.responseCount, 1);
-});
-test("old in-flight GET cannot overwrite a more recent successful mutation", async () => {
-  const h = apiHarness(),
-    c = h.controller(),
-    item = await begin(c);
-  h.delay();
-  const sync = c.sync();
-  await new Promise((r) => setTimeout(r, 0));
-  await c.respond(item, answer());
-  h.release();
-  await sync;
-  assert.equal(c.getSnapshot().runtime.session!.currentItem!.responseCount, 1);
+  assert.deepEqual(Object.keys(payload).sort(), [
+    "answers",
+    "questionnaireVersionId",
+  ]);
 });
 test("legacy history remains readable and untouched until explicit reset", () => {
   const persistent = new MemoryStorage(),

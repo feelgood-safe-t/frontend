@@ -1,4 +1,5 @@
 import type { OnboardingSurveyResult } from "../onboardingTypes";
+import type { EvaluationResult, ProfileAnalysis } from "./pocTypes";
 import { isSessionEnded } from "./domain";
 import type {
   ItemInfo,
@@ -55,6 +56,8 @@ export interface Runtime {
   events: TimelineEvent[];
   itemInfo: Record<string, ItemInfo>;
   pending?: Command;
+  evaluation?: EvaluationResult;
+  profileAnalysis?: ProfileAnalysis;
 }
 export const emptyRuntime = (): Runtime => ({
   version: 2,
@@ -120,6 +123,12 @@ export function saveRecord(storage: Storage, record: RecordSnapshot) {
       survey: newer.survey ?? older.survey,
       events,
       itemInfo: { ...older.itemInfo, ...newer.itemInfo },
+      ...(newer.evaluation || older.evaluation
+        ? { evaluation: newer.evaluation ?? older.evaluation }
+        : {}),
+      ...(newer.profileAnalysis || older.profileAnalysis
+        ? { profileAnalysis: newer.profileAnalysis ?? older.profileAnalysis }
+        : {}),
     };
   }
   storage.setItem(

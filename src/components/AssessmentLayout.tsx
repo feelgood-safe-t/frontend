@@ -9,15 +9,33 @@ export function AssessmentLayout({
   onHome,
   actions,
   mode = "demo",
+  fixedHeader = true,
 }: {
   children: React.ReactNode;
   onHome: () => void;
   actions?: React.ReactNode;
   mode?: "demo" | "api";
+  fixedHeader?: boolean;
 }) {
+  const pageContent = (
+    <>
+      <main className="w-full max-w-6xl mx-auto p-3 sm:p-6 flex-1 space-y-4">
+        {children}
+      </main>
+      <footer className="shrink-0 border-t border-black bg-[#D4D0C8] px-4 py-3 text-xs">
+        <div className="max-w-6xl mx-auto flex flex-wrap justify-between gap-2">
+          <span>청노 · 투자 추천이 아닌 교육용 시뮬레이션</span>
+          {mode === "demo" && <span>데모 · 고정 예시 데이터</span>}
+        </div>
+      </footer>
+    </>
+  );
+
   return (
-    <div className="min-h-dvh flex flex-col bg-[#E7EBEF] text-black">
-      <header className="bg-[#004080] text-white border-b-2 border-black">
+    <div
+      className={`${fixedHeader ? "h-dvh min-h-0 overflow-hidden" : "min-h-dvh"} flex flex-col bg-[#E7EBEF] text-black`}
+    >
+      <header className="shrink-0 bg-[#004080] text-white border-b-2 border-black">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-3 px-4 py-3">
           <HomeLogo onGoHome={onHome} />
           <div className="flex flex-wrap items-center justify-end gap-2">
@@ -25,15 +43,13 @@ export function AssessmentLayout({
           </div>
         </div>
       </header>
-      <main className="w-full max-w-6xl mx-auto p-3 sm:p-6 flex-1 space-y-4">
-        {children}
-      </main>
-      <footer className="border-t border-black bg-[#D4D0C8] px-4 py-3 text-xs">
-        <div className="max-w-6xl mx-auto flex flex-wrap justify-between gap-2">
-          <span>청노 · 투자 추천이 아닌 교육용 시뮬레이션</span>
-          {mode === "demo" && <span>데모 · 고정 예시 데이터</span>}
+      {fixedHeader ? (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="flex min-h-full flex-col">{pageContent}</div>
         </div>
-      </footer>
+      ) : (
+        pageContent
+      )}
     </div>
   );
 }
@@ -58,11 +74,13 @@ export function Dialog({
   onClose,
   children,
   locked = false,
+  panelHeader = false,
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
   locked?: boolean;
+  panelHeader?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null),
     closeRef = useRef(onClose);
@@ -86,10 +104,22 @@ export function Dialog({
       }}
       className="m-auto w-[calc(100%-24px)] max-w-2xl max-h-[90dvh] overflow-y-auto border-2 border-black bg-white p-0 backdrop:bg-black/60"
     >
-      <div className="sticky top-0 bg-[#004080] text-white p-3 flex items-center justify-between gap-3 z-10">
-        <h2 className="font-bold">{title}</h2>
+      <div
+        className={`sticky top-0 z-10 flex items-center justify-between gap-3 ${
+          panelHeader
+            ? "border-b border-black bg-[#E0E0E0] px-4 py-1 text-black"
+            : "bg-[#004080] p-3 text-white"
+        }`}
+      >
+        <h2 className={panelHeader ? "text-sm font-bold" : "font-bold"}>
+          {title}
+        </h2>
         <button
-          className="min-h-10 px-3 border border-white disabled:opacity-40"
+          className={`shrink-0 flex items-center justify-center p-0 disabled:opacity-40 ${
+            panelHeader
+              ? "size-7 border border-black bg-white"
+              : "size-10 border border-white"
+          }`}
           disabled={locked}
           onClick={onClose}
           aria-label="닫기"
@@ -101,6 +131,27 @@ export function Dialog({
     </dialog>
   );
 }
+
+export function RadialLoader({ label }: { label: string }) {
+  return (
+    <div role="status" aria-label={label} className="flex justify-center py-5">
+      <span aria-hidden="true" className="relative block size-12 animate-spin">
+        {Array.from({ length: 12 }, (_, index) => (
+          <span
+            key={index}
+            className="absolute left-1/2 top-1/2 h-3 w-1 -ml-0.5 -mt-1.5 bg-[#004080]"
+            style={{
+              opacity: (index + 1) / 12,
+              transform: `rotate(${index * 30}deg) translateY(-18px)`,
+            }}
+          />
+        ))}
+      </span>
+      <span className="sr-only">{label}</span>
+    </div>
+  );
+}
+
 export function Rules() {
   return (
     <div className="text-sm space-y-3">

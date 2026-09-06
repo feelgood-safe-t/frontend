@@ -1,4 +1,5 @@
-import { ApiError, createApiGateway } from "./api";
+import { ApiError } from "./api";
+import { createPocGateway } from "./pocGateway";
 import {
   appendEvent,
   assertParticipantSafe,
@@ -25,6 +26,7 @@ interface State {
   storageError: string;
   receivedAt: number;
   restored: boolean;
+  evaluating: boolean;
 }
 export class AssessmentController {
   private listeners = new Set<() => void>();
@@ -34,6 +36,7 @@ export class AssessmentController {
   private revision = 0;
   private runtimeStorageError = "";
   private historyStorageError = "";
+  private evaluationAttempted = false;
   readonly runtimeKey: string;
   readonly mode: "api" | "demo";
   constructor(
@@ -42,13 +45,17 @@ export class AssessmentController {
     private persistent: Storage,
     private allowRaw = false,
     fetcher?: typeof fetch,
+    private clock: () => number = Date.now,
   ) {
     this.mode = base ? "api" : "demo";
-    this.runtimeKey = `safe-t:runtime:v2:${base || "demo"}`;
+    this.runtimeKey = base
+      ? `safe-t:runtime:v3:${base}`
+      : "safe-t:runtime:v2:demo";
     let runtime = emptyRuntime(),
       error = "";
     try {
-      runtime = readRuntime(temporary, this.runtimeKey);
+      // API 0.7 has no server session to restore. Never replay legacy persisted commands.
+      if (!base) runtime = readRuntime(temporary, this.runtimeKey);
     } catch (e) {
       error = e instanceof Error ? e.message : "진행 정보를 읽을 수 없습니다.";
     }
@@ -57,12 +64,13 @@ export class AssessmentController {
       busy: false,
       error,
       storageError: "",
-      receivedAt: Date.now(),
+      receivedAt: this.clock(),
       restored: !runtime.sessionId,
+      evaluating: false,
     };
     this.gateway = base
-      ? createApiGateway(base, () => this.state.runtime.participant, fetcher)
-      : createDemoGateway(persistent);
+      ? createPocGateway(base, fetcher, allowRaw, this.clock)
+      : createDemoGateway(persistent, this.clock);
   }
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -78,7 +86,8 @@ export class AssessmentController {
   private persist(update: Partial<Runtime>) {
     const runtime = { ...this.state.runtime, ...update };
     try {
-      this.temporary.setItem(this.runtimeKey, JSON.stringify(runtime));
+      if (this.mode === "demo")
+        this.temporary.setItem(this.runtimeKey, JSON.stringify(runtime));
       this.runtimeStorageError = "";
     } catch {
       this.runtimeStorageError =
@@ -133,7 +142,7 @@ export class AssessmentController {
       itemInfo[session.currentItem.assessmentItemId] = { asset, brief };
     }
     this.persist({ session, itemInfo });
-    this.patch({ receivedAt: Date.now(), restored: true });
+    this.patch({ receivedAt: this.clock(), restored: true });
     this.archive();
   }
   private archive(): boolean {
@@ -146,6 +155,8 @@ export class AssessmentController {
       survey: r.survey ?? null,
       events: r.events,
       itemInfo: r.itemInfo,
+      ...(r.evaluation ? { evaluation: r.evaluation } : {}),
+      ...(r.profileAnalysis ? { profileAnalysis: r.profileAnalysis } : {}),
     };
     try {
       const merged = saveRecord(this.persistent, record);
@@ -156,6 +167,8 @@ export class AssessmentController {
           survey: merged.survey ?? undefined,
           events: merged.events,
           itemInfo: merged.itemInfo,
+          evaluation: merged.evaluation,
+          profileAnalysis: merged.profileAnalysis,
         });
       } else {
         this.patch({ storageError: this.storageError() });
@@ -174,6 +187,7 @@ export class AssessmentController {
     this.patch({ busy: true, error: "" });
     try {
       await fn();
+      await this.evaluateCompleted();
       return true;
     } catch (e) {
       this.patch({
@@ -187,10 +201,28 @@ export class AssessmentController {
       this.patch({ busy: false });
     }
   }
+  private async evaluateCompleted() {
+    const r = this.state.runtime;
+    if (
+      !this.gateway.evaluate ||
+      !r.session ||
+      !isSessionEnded(r.session.status) ||
+      r.evaluation ||
+      this.evaluationAttempted
+    )
+      return;
+    this.evaluationAttempted = true;
+    this.patch({ evaluating: true });
+    try {
+      const evaluation = await this.gateway.evaluate(r.sessionId!);
+      this.persist({ evaluation });
+      this.archive();
+    } finally {
+      this.patch({ evaluating: false });
+    }
+  }
   begin = () =>
     this.run(async () => {
-      if (!this.state.runtime.participant)
-        this.persist({ participant: await this.gateway.guest() });
       this.persist({ questionnaire: await this.gateway.questionnaire() });
     });
   saveDraft = (draft: Record<string, string[]>) => this.persist({ draft });
@@ -202,6 +234,7 @@ export class AssessmentController {
         !old.survey ||
         JSON.stringify(old.survey.answers) !== JSON.stringify(survey.answers)
       ) {
+        this.evaluationAttempted = false;
         this.persist({
           survey,
           surveyId: undefined,
@@ -211,6 +244,8 @@ export class AssessmentController {
           createKey: crypto.randomUUID(),
           events: [],
           itemInfo: {},
+          evaluation: undefined,
+          profileAnalysis: undefined,
         });
       }
       let r = this.state.runtime;
@@ -227,6 +262,19 @@ export class AssessmentController {
         this.persist({
           sessionId: await this.gateway.create(r.surveyId!, r.createKey!),
         });
+      const onboarding = this.gateway.onboarding?.();
+      if (onboarding) {
+        const id = this.state.runtime.sessionId!;
+        this.persist({
+          profileAnalysis: onboarding.profileAnalysis,
+          itemInfo: Object.fromEntries(
+            onboarding.assessment.items.map((item) => [
+              `${id}-item-${item.ordinal}`,
+              { asset: item.scenario.asset, brief: item.scenario.brief },
+            ]),
+          ),
+        });
+      }
       this.accept(await this.gateway.get(this.state.runtime.sessionId!));
     });
   start = () =>
@@ -245,7 +293,15 @@ export class AssessmentController {
         const session = await this.gateway.get(id);
         if (revision === this.revision) {
           this.accept(session);
-          this.patch({ error: "" });
+          if (!isSessionEnded(session.status) || !this.evaluationAttempted)
+            this.patch({ error: "" });
+          if (
+            isSessionEnded(session.status) &&
+            this.gateway.evaluate &&
+            !this.state.runtime.evaluation &&
+            !this.evaluationAttempted
+          )
+            await this.run(async () => {});
         }
       } catch (e) {
         if (revision === this.revision)
@@ -306,6 +362,9 @@ export class AssessmentController {
         this.persist({ pending: undefined });
         if (e.status === 409) {
           this.accept(await this.gateway.get(id));
+          // A click racing the final deadline can end the whole test. There is
+          // no active screen left to tick, so seal/evaluate without waiting for another sync.
+          await this.evaluateCompleted();
           throw new Error(
             "문항이 종료되었거나 상태가 변경됐습니다. 현재 문항을 확인해 주세요.",
           );
@@ -342,6 +401,7 @@ export class AssessmentController {
     this.command({ kind: "finish", itemId, key: crypto.randomUUID() });
   retry = () =>
     this.run(async () => {
+      this.evaluationAttempted = false;
       const p = this.state.runtime.pending;
       if (p) await this.send(p);
       else if (this.state.runtime.sessionId)
@@ -349,6 +409,17 @@ export class AssessmentController {
     });
   newAssessment = () => {
     if (this.state.busy) return false;
+    if (
+      this.mode === "api" &&
+      isSessionEnded(this.state.runtime.session?.status) &&
+      !this.state.runtime.evaluation
+    ) {
+      this.patch({
+        error:
+          "판단 기록이 남아 있습니다. 평가 결과를 먼저 다시 요청해 주세요.",
+      });
+      return false;
+    }
     if (this.state.runtime.pending) {
       this.patch({ error: "이전 요청의 처리 결과를 먼저 확인해 주세요." });
       return false;
@@ -356,9 +427,9 @@ export class AssessmentController {
     // Keep the last recoverable copy until the completed record is durable.
     if (!this.archive()) return false;
     this.revision++;
-    const participant = this.state.runtime.participant;
+    this.evaluationAttempted = false;
     this.patch({
-      runtime: { ...emptyRuntime(), participant },
+      runtime: emptyRuntime(),
       error: "",
       restored: true,
     });
@@ -368,8 +439,11 @@ export class AssessmentController {
   reset = () => {
     if (this.state.busy) return;
     this.revision++;
+    this.evaluationAttempted = false;
     try {
       this.temporary.removeItem(this.runtimeKey);
+      if (this.base)
+        this.temporary.removeItem(`safe-t:runtime:v2:${this.base}`);
       for (const key of [HISTORY_KEY, ...LEGACY_KEYS, DEMO_STORAGE_KEY])
         this.persistent.removeItem(key);
       this.runtimeStorageError = "";
@@ -380,7 +454,7 @@ export class AssessmentController {
         error: "",
         storageError: "",
         restored: true,
-        receivedAt: Date.now(),
+        receivedAt: this.clock(),
       });
     } catch {
       this.patch({

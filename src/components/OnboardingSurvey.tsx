@@ -5,6 +5,7 @@ import {
 } from "../data/onboardingQuestions";
 import { OnboardingQuestion, OnboardingSurveyResult } from "../onboardingTypes";
 import { HomeLogo } from "./HomeLogo";
+import { Panel, RadialLoader } from "./AssessmentLayout";
 
 interface OnboardingSurveyProps {
   onGoHome: () => void;
@@ -64,6 +65,9 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
     [answers, questions],
   );
   const progressPercent = Math.round((answeredCount / questions.length) * 100);
+  useEffect(() => {
+    if (isSubmitting) window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [isSubmitting]);
 
   useEffect(() => {
     onAnswersChange?.(answers);
@@ -162,10 +166,33 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
     onGoHome();
   };
 
+  if (isSubmitting)
+    return (
+      <div className="h-dvh min-h-0 overflow-hidden bg-[#E7EBEF] text-black flex flex-col">
+        <header className="shrink-0 bg-[#004080] text-white border-b-2 border-black">
+          <div className="max-w-6xl mx-auto px-4 py-3">
+            <HomeLogo onGoHome={handleGoHome} />
+          </div>
+        </header>
+        <main className="min-h-0 flex-1 w-full max-w-3xl mx-auto overflow-y-auto p-3 sm:p-6">
+          <Panel title="설문 분석 중">
+            <h1 role="status" className="text-2xl font-black">
+              나에게 맞는 세 가지 문항을 준비하고 있어요.
+            </h1>
+            <p className="mt-4 text-sm leading-7">
+              설문 응답을 분석하고 연습할 시장 상황을 고르고 있습니다. 잠시
+              시간이 걸릴 수 있으니 화면을 닫지 말아 주세요.
+            </p>
+            <RadialLoader label="설문 응답 분석 중" />
+          </Panel>
+        </main>
+      </div>
+    );
+
   if (!hasStarted) {
     return (
-      <div className="min-h-dvh bg-[#E7EBEF] text-black font-gulim flex flex-col">
-        <header className="bg-[#004080] text-white border-b-2 border-black">
+      <div className="h-dvh min-h-0 overflow-hidden bg-[#E7EBEF] text-black font-gulim flex flex-col">
+        <header className="shrink-0 bg-[#004080] text-white border-b-2 border-black">
           <div className="w-full max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
             <HomeLogo onGoHome={handleGoHome} />
             <span className="hidden sm:inline border border-blue-200 bg-[#002B57] px-3 py-1 text-xs font-bold">
@@ -174,7 +201,7 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
           </div>
         </header>
 
-        <main className="flex-1 w-full max-w-3xl mx-auto px-3 sm:px-4 pt-4 pb-8 sm:pt-8 sm:pb-12">
+        <main className="min-h-0 flex-1 w-full max-w-3xl mx-auto overflow-y-auto px-3 sm:px-4 pt-4 pb-8 sm:pt-8 sm:pb-12">
           <section
             className="w-full bg-white border-2 border-black"
             aria-labelledby="onboarding-title"
@@ -259,209 +286,202 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
   }
 
   return (
-    <div className="min-h-dvh bg-[#E7EBEF] text-black font-gulim flex flex-col">
-      <header className="bg-[#004080] text-white border-b-2 border-black">
-        <div className="w-full max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
-          <HomeLogo onGoHome={handleGoHome} />
-          <div className="flex items-center gap-3 text-xs">
-            <span className="text-blue-100">응답 현황</span>
-            <strong className="bg-white text-[#004080] border border-black px-2 py-1 font-mono">
-              {answeredCount}/{questions.length}
-            </strong>
+    <div className="h-dvh min-h-0 overflow-hidden bg-[#E7EBEF] text-black font-gulim flex flex-col">
+      <div className="shrink-0 z-30">
+        <header className="bg-[#004080] text-white border-b-2 border-black">
+          <div className="w-full max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+            <HomeLogo onGoHome={handleGoHome} />
+            <div className="flex items-center gap-3 text-xs">
+              <span className="text-blue-100">응답 현황</span>
+              <strong className="bg-white text-[#004080] border border-black px-2 py-1 font-mono">
+                {answeredCount}/{questions.length}
+              </strong>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <div className="bg-white border-b border-black">
-        <div className="w-full max-w-6xl mx-auto px-4 py-2 flex items-center gap-3">
-          <div
-            className="h-3 flex-1 border border-black bg-[#E0E0E0]"
-            role="progressbar"
-            aria-label="설문 응답 진행률"
-            aria-valuemin={0}
-            aria-valuemax={questions.length}
-            aria-valuenow={answeredCount}
-          >
+        <div className="bg-white border-b border-black">
+          <div className="w-full max-w-6xl mx-auto px-4 py-2 flex items-center gap-3">
             <div
-              className="h-full bg-[#177245]"
-              style={{ width: `${progressPercent}%` }}
-            />
+              className="h-3 flex-1 border border-black bg-[#E0E0E0]"
+              role="progressbar"
+              aria-label="설문 응답 진행률"
+              aria-valuemin={0}
+              aria-valuemax={questions.length}
+              aria-valuenow={answeredCount}
+            >
+              <div
+                className="h-full bg-[#177245]"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <span className="w-10 text-right text-xs font-black font-mono">
+              {progressPercent}%
+            </span>
           </div>
-          <span className="w-10 text-right text-xs font-black font-mono">
-            {progressPercent}%
-          </span>
         </div>
       </div>
 
-      <main className="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+      <main className="min-h-0 flex-1 w-full max-w-6xl mx-auto overflow-y-auto px-3 sm:px-4 py-4 sm:py-6">
         <div className="grid grid-cols-1 md:grid-cols-[230px_minmax(0,1fr)] gap-4 items-start">
-          <aside
-            className="bg-white border-2 border-black md:sticky md:top-4"
-            aria-label="설문 문항 목록"
-          >
-            <div className="bg-[#E0E0E0] border-b border-black px-3 py-2 text-xs font-black">
-              문항 이동
-            </div>
-            <div className="grid grid-cols-5 md:grid-cols-2 gap-1.5 p-2">
-              {questions.map((question, index) => {
-                const isCurrent = index === currentIndex;
-                const isComplete = hasValidAnswer(
-                  question,
-                  answers[question.id],
-                );
-                const isLocked = index > maxVisitedIndex;
-
-                return (
-                  <button
-                    type="button"
-                    key={question.id}
-                    disabled={isLocked || isSubmitting}
-                    onClick={() => moveToQuestion(index)}
-                    aria-current={isCurrent ? "step" : undefined}
-                    aria-label={`${index + 1}번 문항${isComplete ? ", 응답 완료" : isLocked ? ", 잠김" : ", 미응답"}`}
-                    className={`min-h-11 border px-2 py-1.5 text-xs font-bold flex items-center justify-center md:justify-start gap-1.5 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#004080] ${
-                      isCurrent
-                        ? "border-2 border-[#004080] bg-[#EAF3FF] text-[#004080]"
-                        : isComplete
-                          ? "border-[#177245] bg-[#EDF8F0] text-[#145C38] cursor-pointer hover:bg-[#DFF2E5]"
-                          : isLocked
-                            ? "border-gray-300 bg-[#F2F2F2] text-gray-400 cursor-not-allowed"
-                            : "border-black bg-white text-black cursor-pointer hover:bg-gray-50"
-                    }`}
-                  >
-                    <span className="font-mono">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    <span className="hidden md:inline">
-                      {isComplete ? "완료" : isLocked ? "잠김" : "작성 중"}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="border-t border-black bg-[#F8F9FA] p-3 text-[11px] leading-relaxed text-gray-600 hidden md:block">
-              완료한 문항은 다시 열어 수정할 수 있습니다. 설문에는 별도 제한
-              시간이 없습니다.
-            </div>
-          </aside>
-
-          <section
-            className="bg-white border-2 border-black"
-            aria-labelledby="question-heading"
-          >
-            <div className="bg-[#E0E0E0] border-b border-black px-3 py-2 flex items-center justify-between gap-3 text-xs">
-              <span className="font-black">
-                문항 {currentIndex + 1} / {questions.length}
-              </span>
-              <span className="bg-[#FFE600] border border-black px-2 py-0.5 font-black">
-                필수 응답
-              </span>
-            </div>
-
-            <div className="p-4 sm:p-6">
-              <div className="text-xs font-black text-[#004080] mb-2">
-                {currentQuestion.category}
+          <div className="md:sticky md:top-4 space-y-2">
+            <aside
+              className="bg-white border-2 border-black"
+              aria-label="설문 문항 목록"
+            >
+              <div className="bg-[#E0E0E0] border-b border-black px-3 py-2 text-xs font-black">
+                문항 이동
               </div>
-              <h1
-                id="question-heading"
-                ref={questionHeadingRef}
-                tabIndex={-1}
-                className="text-xl sm:text-2xl font-black leading-snug focus:outline-none"
-              >
-                <span className="text-[#004080] font-mono mr-2">
-                  Q{currentIndex + 1}.
-                </span>
-                {currentQuestion.prompt}
-              </h1>
-              <p className="mt-3 border-l-4 border-[#004080] bg-[#F4F7FA] px-3 py-2 text-xs sm:text-sm text-gray-700 leading-relaxed">
-                {currentQuestion.detail}
-              </p>
-
-              <div className="mt-5 flex flex-wrap items-center justify-between gap-2 text-xs">
-                <span className="font-bold">
-                  {currentQuestion.type === "MULTI_CHOICE"
-                    ? `복수 선택 · ${currentQuestion.minSelections}~${currentQuestion.maxSelections}개`
-                    : "단일 선택 · 1개"}
-                </span>
-                <span className="text-gray-600">
-                  현재 선택 {currentAnswer.length}개
-                </span>
-              </div>
-
-              <fieldset
-                disabled={isSubmitting}
-                className="mt-2 grid grid-cols-1 gap-2 disabled:opacity-60"
-              >
-                <legend className="sr-only">{currentQuestion.prompt}</legend>
-                {currentQuestion.options.map((option, optionIndex) => {
-                  const isSelected = currentAnswer.includes(option.id);
-                  const inputId = `${currentQuestion.id}-${option.id}`;
+              <div className="grid grid-cols-5 md:grid-cols-2 gap-1.5 p-2">
+                {questions.map((question, index) => {
+                  const isCurrent = index === currentIndex;
+                  const isComplete = hasValidAnswer(
+                    question,
+                    answers[question.id],
+                  );
+                  const isLocked = index > maxVisitedIndex;
 
                   return (
-                    <label
-                      key={option.id}
-                      htmlFor={inputId}
-                      className={`min-h-[64px] border p-3 flex items-start gap-3 cursor-pointer focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-[#004080] ${
-                        isSelected
-                          ? "border-2 border-[#004080] bg-[#EAF3FF]"
-                          : "border-black bg-white hover:bg-[#F7FAFC]"
+                    <button
+                      type="button"
+                      key={question.id}
+                      disabled={isLocked || isSubmitting}
+                      onClick={() => moveToQuestion(index)}
+                      aria-current={isCurrent ? "step" : undefined}
+                      aria-label={`${index + 1}번 문항${isComplete ? ", 응답 완료" : isLocked ? ", 잠김" : ", 미응답"}`}
+                      className={`min-h-8 border px-1 py-1 text-[10px] font-bold flex items-center justify-center gap-1 md:min-h-11 md:justify-start md:px-2 md:py-1.5 md:text-xs md:gap-1.5 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#004080] ${
+                        isCurrent
+                          ? "border-2 border-[#004080] bg-[#EAF3FF] text-[#004080]"
+                          : isComplete
+                            ? "border-[#177245] bg-[#EDF8F0] text-[#145C38] cursor-pointer hover:bg-[#DFF2E5]"
+                            : isLocked
+                              ? "border-gray-300 bg-[#F2F2F2] text-gray-400 cursor-not-allowed"
+                              : "border-black bg-white text-black cursor-pointer hover:bg-gray-50"
                       }`}
                     >
-                      <input
-                        id={inputId}
-                        type={
-                          currentQuestion.type === "MULTI_CHOICE"
-                            ? "checkbox"
-                            : "radio"
-                        }
-                        name={currentQuestion.id}
-                        checked={isSelected}
-                        onChange={() => selectOption(option.id)}
-                        className="mt-1 h-4 w-4 shrink-0 accent-[#004080]"
-                      />
-                      <span className="flex-1 min-w-0">
-                        <span className="flex flex-wrap items-center gap-2 font-black text-sm text-black">
-                          <span className="font-mono text-[#004080]">
-                            {optionIndex + 1}.
-                          </span>
-                          {option.label}
-                          {isSelected && (
-                            <span className="bg-[#004080] text-white px-1.5 py-0.5 text-[10px]">
-                              선택됨
-                            </span>
-                          )}
-                        </span>
-                        <span className="block mt-1 text-xs text-gray-600 leading-relaxed">
-                          {option.detail}
-                        </span>
+                      <span className="font-mono">
+                        {String(index + 1).padStart(2, "0")}
                       </span>
-                    </label>
+                      <span className="hidden md:inline">
+                        {isComplete ? "완료" : isLocked ? "잠김" : "작성 중"}
+                      </span>
+                    </button>
                   );
                 })}
-              </fieldset>
-
-              <div className="min-h-8 mt-2">
-                {validationError || error ? (
-                  <div
-                    role="alert"
-                    className="border border-[#D90000] bg-[#FFEAEA] px-3 py-2 text-xs text-[#B00000] font-bold"
-                  >
-                    ※ {validationError || error}
-                  </div>
-                ) : (
-                  <p className="px-1 py-2 text-[11px] text-gray-500">
-                    선택한 응답은 이전 문항으로 돌아가 다시 수정할 수 있습니다.
-                  </p>
-                )}
               </div>
-            </div>
+            </aside>
+            <p className="px-1 text-[11px] leading-relaxed text-gray-600">
+              선택한 응답은 이전 문항으로 돌아가 다시 수정할 수 있습니다.
+            </p>
+          </div>
 
-            <div className="bg-[#E0E0E0] border-t border-black p-3 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2">
+          <div className="space-y-3">
+            <section
+              className="bg-white border-2 border-black"
+              aria-labelledby="question-heading"
+            >
+              <div className="bg-[#E0E0E0] border-b border-black px-3 py-2 flex items-center justify-between gap-3 text-xs">
+                <span className="font-black">
+                  문항 {currentIndex + 1} / {questions.length}
+                </span>
+              </div>
+
+              <div className="p-4 sm:p-6">
+                <div className="text-xs font-black text-[#004080] mb-2">
+                  {currentQuestion.category}
+                </div>
+                <h1
+                  id="question-heading"
+                  ref={questionHeadingRef}
+                  tabIndex={-1}
+                  className="text-xl sm:text-2xl font-black leading-snug focus:outline-none"
+                >
+                  <span className="text-[#004080] font-mono mr-2">
+                    Q{currentIndex + 1}.
+                  </span>
+                  {currentQuestion.prompt}
+                </h1>
+                <p className="mt-3 bg-[#EAF3FF] px-3 py-2 text-xs sm:text-sm text-gray-700 leading-relaxed">
+                  {currentQuestion.detail}
+                </p>
+
+                <div className="mt-5 text-xs">
+                  <span className="font-bold">
+                    {currentQuestion.type === "MULTI_CHOICE"
+                      ? `복수 선택 · ${currentQuestion.minSelections}~${currentQuestion.maxSelections}개`
+                      : "단일 선택 · 1개"}
+                  </span>
+                </div>
+
+                <fieldset
+                  disabled={isSubmitting}
+                  className="mt-2 grid grid-cols-1 gap-2 disabled:opacity-60"
+                >
+                  <legend className="sr-only">{currentQuestion.prompt}</legend>
+                  {currentQuestion.options.map((option, optionIndex) => {
+                    const isSelected = currentAnswer.includes(option.id);
+                    const inputId = `${currentQuestion.id}-${option.id}`;
+
+                    return (
+                      <label
+                        key={option.id}
+                        htmlFor={inputId}
+                        className={`min-h-[64px] border p-3 flex items-start gap-3 cursor-pointer focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-[#004080] ${
+                          isSelected
+                            ? "border-2 border-[#004080] bg-[#EAF3FF]"
+                            : "border-black bg-white hover:bg-[#F7FAFC]"
+                        }`}
+                      >
+                        <input
+                          id={inputId}
+                          type={
+                            currentQuestion.type === "MULTI_CHOICE"
+                              ? "checkbox"
+                              : "radio"
+                          }
+                          name={currentQuestion.id}
+                          checked={isSelected}
+                          onChange={() => selectOption(option.id)}
+                          className="mt-1 h-4 w-4 shrink-0 accent-[#004080]"
+                        />
+                        <span className="flex-1 min-w-0">
+                          <span className="flex flex-wrap items-center gap-2 font-black text-sm text-black">
+                            <span className="font-mono text-[#004080]">
+                              {optionIndex + 1}.
+                            </span>
+                            {option.label}
+                          </span>
+                          <span className="block mt-1 text-xs text-gray-600 leading-relaxed">
+                            {option.detail}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </fieldset>
+
+                <div className="min-h-8 mt-2">
+                  {validationError || error ? (
+                    <div
+                      role="alert"
+                      className="border border-[#D90000] bg-[#FFEAEA] px-3 py-2 text-xs text-[#B00000] font-bold"
+                    >
+                      ※ {validationError || error}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </section>
+
+            <nav
+              aria-label="설문 문항 이동"
+              className="flex items-center justify-between gap-2"
+            >
               <button
                 type="button"
                 disabled={currentIndex === 0 || isSubmitting}
                 onClick={() => moveToQuestion(currentIndex - 1)}
-                className="min-h-11 bg-white hover:bg-gray-100 text-black border border-black px-5 py-2 text-xs font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#004080]"
+                className="min-h-10 bg-white hover:bg-gray-100 text-black border border-black px-3 py-2 text-[11px] font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#004080] sm:min-h-11 sm:px-5 sm:text-xs"
               >
                 ← 이전 문항
               </button>
@@ -470,7 +490,7 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
                 <button
                   type="button"
                   onClick={handleNext}
-                  className="min-h-11 bg-[#004080] hover:bg-[#002B57] text-white border-2 border-black px-6 py-2 text-sm font-black cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#004080]"
+                  className="min-h-10 bg-[#004080] hover:bg-[#002B57] text-white border-2 border-black px-3 py-2 text-xs font-black cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#004080] sm:min-h-11 sm:px-6 sm:text-sm"
                 >
                   다음 문항 →
                 </button>
@@ -479,13 +499,13 @@ export const OnboardingSurvey: React.FC<OnboardingSurveyProps> = ({
                   type="button"
                   onClick={handleComplete}
                   disabled={isSubmitting}
-                  className="min-h-11 bg-[#177245] hover:bg-[#10552F] text-white border-2 border-black px-6 py-2 text-sm font-black cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#177245]"
+                  className="min-h-10 bg-[#177245] hover:bg-[#10552F] text-white border-2 border-black px-3 py-2 text-xs font-black cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#177245] sm:min-h-11 sm:px-6 sm:text-sm"
                 >
                   {isSubmitting ? "평가 준비 중…" : "설문 완료 →"}
                 </button>
               )}
-            </div>
-          </section>
+            </nav>
+          </div>
         </div>
       </main>
 

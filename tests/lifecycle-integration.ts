@@ -1,535 +1,258 @@
-// Run from frontend: node --import tsx tests/lifecycle-integration.ts
-// Owns a temporary backend on port 8001; never connects to the user's port 8000.
+// Uses an OS-assigned loopback port and injected model responses. Never calls
+// the user's development server, OpenAI, old session APIs or a database.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { once } from "node:events";
-import { fileURLToPath } from "node:url";
+import { createInterface } from "node:readline";
 import { setTimeout as delay } from "node:timers/promises";
-import { AssessmentController } from "../src/assessment/controller";
-import { createApiGateway } from "../src/assessment/api";
+import { fileURLToPath } from "node:url";
 import { readHistory } from "../src/assessment/storage";
-import type {
-  Direction,
-  JudgmentInput,
-  TimelineEvent,
-} from "../src/assessment/types";
+import {
+  MemoryStorage,
+  PocHarness,
+  runApiSmoke,
+  verifyDisposableBackend,
+} from "./api-smoke";
 
-class MemoryStorage implements Storage {
-  data = new Map<string, string>();
-  get length() {
-    return this.data.size;
-  }
-  clear() {
-    this.data.clear();
-  }
-  getItem(key: string) {
-    return this.data.get(key) ?? null;
-  }
-  setItem(key: string, value: string) {
-    this.data.set(key, value);
-  }
-  removeItem(key: string) {
-    this.data.delete(key);
-  }
-  key(index: number) {
-    return [...this.data.keys()][index] ?? null;
-  }
-}
-
-const base = "http://127.0.0.1:8001";
 const backend = fileURLToPath(new URL("../../backend/", import.meta.url));
-const controlToken = randomBytes(32).toString("hex");
-const snapshotToken = randomBytes(32).toString("hex");
+const entry = fileURLToPath(new URL("./poc_server.py", import.meta.url));
 const runId = randomUUID();
-const server = spawn(
-  `${backend}.venv/bin/python`,
-  ["tests/lifecycle_server.py"],
-  {
-    cwd: backend,
-    env: {
-      ...process.env,
-      PYTHONPATH: `${backend}src`,
-      SAFE_T_LIFECYCLE_CONTROL_TOKEN: controlToken,
-      SAFE_T_LIFECYCLE_RUN_ID: runId,
-      SAFE_T_SNAPSHOT_READER_TOKEN: snapshotToken,
-    },
-    stdio: ["ignore", "ignore", "pipe"],
+const python = process.env.SAFE_T_TEST_PYTHON ?? `${backend}.venv/bin/python`;
+const server = spawn(python, ["-B", entry], {
+  cwd: backend,
+  env: {
+    ...process.env,
+    PYTHONPATH: `${backend}src`,
+    SAFE_T_TEST_RUN_ID: runId,
+    PYTHONDONTWRITEBYTECODE: "1",
   },
-);
+  stdio: ["ignore", "pipe", "pipe"],
+});
 let startupError = "";
-server.stderr.setEncoding("utf8").on("data", (text: string) => {
-  startupError = (startupError + text).slice(-4000);
+server.stderr.setEncoding("utf8").on("data", (value: string) => {
+  startupError = (startupError + value).slice(-4000);
 });
 server.on("error", (error) => {
   startupError = error.message;
 });
-
-async function control(path: string, milliseconds?: number) {
-  const response = await fetch(`${base}/__lifecycle__/${path}`, {
-    method: milliseconds === undefined ? "GET" : "POST",
-    headers: {
-      "X-Lifecycle-Control": controlToken,
-      "Content-Type": "application/json",
-    },
-    body:
-      milliseconds === undefined ? undefined : JSON.stringify({ milliseconds }),
-    signal: AbortSignal.timeout(1500),
-  });
-  assert.equal(
-    response.status,
-    200,
-    "The disposable fixture did not authorize this run",
-  );
-  return response.json();
-}
-const advance = (milliseconds: number) => control("clock", milliseconds);
-const judgment = (direction: Direction = "UP"): JudgmentInput => ({
-  clientEventId: randomUUID(),
-  direction,
-  confidence: "MEDIUM",
-  reasonTags: ["PRICE", "NEWS"],
-  reasonText: "가격과 공개 정보를 확인한 통합 테스트 판단입니다.",
+const lines = createInterface({ input: server.stdout });
+let announcedBase: string | undefined;
+lines.on("line", (line) => {
+  try {
+    const data = JSON.parse(line);
+    if (data.runId === runId && typeof data.base === "string")
+      announcedBase = data.base;
+  } catch {
+    /* Uvicorn diagnostics are not server identity announcements. */
+  }
 });
-type Snapshot = {
-  snapshotHash: string;
-  payload: {
-    survey: { responses: unknown[] };
-    items: {
-      ordinal: number;
-      responseCount: number;
-      answerStatus: string;
-      dataDelivered: boolean;
-      scenarioSummary: unknown;
-      responses: {
-        responseId: string;
-        sequence: number;
-        direction: string;
-        reasonTags: string[];
-        confidence: string;
-        reasonText: string;
-      }[];
-      contentViews: { viewId: string; sequence: number; contentId: string }[];
-    }[];
-  };
-};
-async function seal(sessionId: string): Promise<Snapshot> {
-  const response = await fetch(
-    `${base}/internal/v1/assessment-sessions/${sessionId}/evaluation-snapshot`,
-    {
-      method: "POST",
-      headers: { Authorization: `Bearer ${snapshotToken}` },
-    },
-  );
-  assert.equal(response.status, 200);
-  return response.json();
-}
-
 const history = new MemoryStorage();
-class Harness {
-  temporary = new MemoryStorage();
-  loseNextAck: string | undefined;
-  lostAttempts: { path: string; body: string | null; key: string | null }[] =
-    [];
-  fetcher: typeof fetch = async (input, init) => {
-    const path = new URL(String(input)).pathname;
-    const headers = new Headers(init?.headers);
-    assert.equal(
-      headers.has("Authorization"),
-      false,
-      "No participant Bearer in no-auth mode",
-    );
-    if (path !== "/v1/participants/guest")
-      assert.ok(headers.get("X-Participant-Id"));
-    const response = await fetch(input, init);
-    if (
-      this.loseNextAck &&
-      path.endsWith(this.loseNextAck) &&
-      init?.method === "POST"
-    ) {
-      this.loseNextAck = undefined;
-      assert.ok(
-        response.ok,
-        "Only an accepted server mutation may lose its acknowledgment",
-      );
-      this.lostAttempts.push({
-        path,
-        body: typeof init.body === "string" ? init.body : null,
-        key: headers.get("Idempotency-Key"),
-      });
-      await response.arrayBuffer(); // Server committed; simulate the response never reaching the UI.
-      throw new TypeError("Simulated lost acknowledgment");
-    }
-    return response;
-  };
-  c = new AssessmentController(
-    base,
-    this.temporary,
-    history,
-    true,
-    this.fetcher,
-  );
-  get runtime() {
-    return this.c.getSnapshot().runtime;
-  }
-  get session() {
-    return this.runtime.session!;
-  }
-  get item() {
-    return this.session.currentItem!;
-  }
-  get gateway() {
-    return createApiGateway(base, () => this.runtime.participant, this.fetcher);
-  }
-  checked = (ok: boolean) => assert.ok(ok, this.c.getSnapshot().error);
-  async onboard() {
-    this.checked(await this.c.begin());
-    assert.ok(this.runtime.participant!.participantId);
-    assert.equal(this.runtime.participant!.accessToken, undefined);
-    const q = this.runtime.questionnaire!;
-    assert.equal(q.questions.length, 10);
-    this.checked(
-      await this.c.submit({
-        questionnaireVersionId: q.questionnaireVersionId,
-        completedAt: new Date().toISOString(),
-        answers: q.questions.map((question) => ({
-          questionId: question.id,
-          optionIds: question.options
-            .slice(0, question.minSelections)
-            .map((o) => o.id),
-        })),
-      }),
-    );
-    assert.equal(this.session.status, "CREATED");
-    this.checked(await this.c.start());
-    const startedAt = this.item.startedAt;
-    this.checked(await this.c.start());
-    assert.equal(
-      this.item.startedAt,
-      startedAt,
-      "Repeated start must not reset time",
-    );
-  }
-  async reload() {
-    this.c = new AssessmentController(
-      base,
-      this.temporary,
-      history,
-      true,
-      this.fetcher,
-    );
-    await this.c.sync();
-    assert.equal(this.c.getSnapshot().error, "");
-    assert.equal(this.c.getSnapshot().restored, true);
-  }
-  async retryAfterReload() {
-    const pending = structuredClone(this.runtime.pending);
-    assert.ok(pending);
-    await this.reload();
-    assert.deepEqual(
-      this.runtime.pending,
-      pending,
-      "Reload must preserve the exact retry identity",
-    );
-    this.checked(await this.c.retry());
-    assert.equal(this.runtime.pending, undefined);
-  }
-  async availableNews() {
-    const news = [...this.item.scenario.news].sort(
-      (a, b) => a.availableAtOffsetMs - b.availableAtOffsetMs,
-    )[0];
-    assert.ok(news, "Every scenario must have news");
-    const delta = Math.max(
-      0,
-      Math.ceil(
-        (news.availableAtOffsetMs - this.item.currentMarketOffsetMs) / 60,
-      ),
-    );
-    assert.ok(
-      delta < this.item.remainingMs,
-      "News should be available before the item closes",
-    );
-    if (delta) {
-      await advance(delta);
-      await this.c.sync();
-    }
-    return news;
-  }
-  async sealAndRestore(expectedEvents: number) {
-    const snapshot = await seal(this.session.assessmentSessionId);
-    assert.deepEqual(
-      await seal(this.session.assessmentSessionId),
-      snapshot,
-      "Snapshot is immutable and idempotent",
-    );
-    await this.reload();
-    assert.equal(this.session.status, "SNAPSHOT_READY");
-    const matches = readHistory(history).filter(
-      (r) => r.id === this.session.assessmentSessionId,
-    );
-    assert.equal(
-      matches.length,
-      1,
-      "A sync must update, not duplicate, the history record",
-    );
-    assert.equal(matches[0].session.status, "SNAPSHOT_READY");
-    assert.equal(matches[0].events.length, expectedEvents);
-    assert.equal(
-      "score" in matches[0].session,
-      false,
-      "A snapshot is not a score/report",
-    );
-    return snapshot;
-  }
-}
 
-async function fullLifecycle() {
-  const h = new Harness();
+async function earlyFinish(base: string) {
+  const h = new PocHarness(base, history);
   await h.onboard();
-  for (let ordinal = 1; ordinal <= 3; ordinal++) {
-    assert.equal(h.item.ordinal, ordinal);
-    assert.equal(h.item.scenario.candles.length, 240);
-    assert.equal(h.item.scenario.replaySpeed, 60);
-    assert.equal(h.item.remainingMs, 180_000);
-    assert.ok(
-      h.session.items
-        .filter((item) => item.ordinal > ordinal)
-        .every((item) => item.status === "LOCKED"),
-    );
-    const id = h.item.assessmentItemId;
-    const input = judgment();
-    if (ordinal === 1) {
-      h.loseNextAck = "/response";
-      assert.equal(await h.c.respond(id, input), false);
-      assert.equal(
-        (await h.gateway.get(h.session.assessmentSessionId)).currentItem!
-          .responseCount,
-        1,
-      );
-      await h.retryAfterReload();
-    } else h.checked(await h.c.respond(id, input));
-    const news = await h.availableNews();
-    if (ordinal === 1) {
-      h.loseNextAck = "/content-views";
-      assert.equal(await h.c.view(id, news.contentId), false);
-      await h.retryAfterReload();
-    } else h.checked(await h.c.view(id, news.contentId));
-    h.checked(await h.c.respond(id, judgment("UP")));
-    const doubleClick = await Promise.all([
-      h.c.respond(id, judgment("DOWN")),
-      h.c.respond(id, judgment("DOWN")),
-    ]);
-    assert.deepEqual(
-      doubleClick,
-      [true, false],
-      "An in-flight UI command must ignore the extra click",
-    );
-    assert.equal(h.item.responseCount, 3);
-    await h.reload();
-    assert.equal(h.item.latestDirection, "DOWN");
-    if (ordinal === 1) {
-      h.loseNextAck = "/complete";
-      assert.equal(await h.c.complete(id), false);
-      await h.retryAfterReload();
-      const key = h.lostAttempts.at(-1)!.key!;
-      const repeated = await h.gateway.complete(
-        h.session.assessmentSessionId,
-        id,
-        key,
-      );
-      assert.equal(repeated.currentItem!.ordinal, 2);
-      await h.c.sync();
-      assert.equal(
-        h.item.ordinal,
-        2,
-        "Duplicate complete must not skip an item",
-      );
-    } else h.checked(await h.c.complete(id));
-  }
-  assert.equal(h.session.status, "ENDED");
-  assert.equal(h.session.answeredQuestionCount, 3);
-  assert.ok(
-    h.session.items.every(
-      (i) =>
-        i.answerStatus === "ANSWERED" && i.closeReason === "USER_COMPLETED",
-    ),
-  );
-  const snapshot = await h.sealAndRestore(12);
-  assert.equal(snapshot.payload.survey.responses.length, 10);
-  const serverEvents = snapshot.payload.items
-    .flatMap((i) => [...i.responses, ...i.contentViews])
-    .sort((a, b) => a.sequence - b.sequence);
+  await h.advance(1000);
+  h.checked(await h.c.respond(h.item.assessmentItemId, h.judgment("DOWN")));
+  h.checked(await h.c.finish(h.item.assessmentItemId));
+  assert.equal(h.runtime.evaluation?.totalScore, 33.33);
+  assert.equal(h.runtime.evaluation?.passed, false);
+  assert.equal(h.runtime.evaluation?.passArtifact, null);
   assert.deepEqual(
-    serverEvents.map((event) => event.sequence),
-    Array.from({ length: 12 }, (_, i) => i + 1),
+    h.runtime.evaluation?.itemScores.map((i) => i.itemScore),
+    [100, 0, 0],
   );
   assert.deepEqual(
-    serverEvents.map((event) =>
-      "responseId" in event ? event.responseId : event.viewId,
-    ),
-    h.runtime.events.map((e: TimelineEvent) => e.event.eventId),
+    h.finalBundle.items.map((i) => [
+      i.completionReason,
+      i.finalElapsedMs,
+      i.events.length,
+    ]),
+    [
+      ["ASSESSMENT_FINISHED", 1000, 1],
+      ["ASSESSMENT_FINISHED", 0, 0],
+      ["ASSESSMENT_FINISHED", 0, 0],
+    ],
   );
-  for (const item of snapshot.payload.items) {
-    assert.deepEqual(
-      item.responses.map((e) => e.direction),
-      ["UP", "UP", "DOWN"],
-    );
-    assert.equal(item.contentViews.length, 1);
-    assert.ok(
-      item.responses.every(
-        (e) =>
-          e.confidence === "MEDIUM" &&
-          e.reasonText &&
-          e.reasonTags.includes("NEWS"),
-      ),
-    );
-  }
+  h.assertArchived(1);
   console.log(
-    "PASS 실제 저장: 3문항·9판단·3열람, 전역 sequence, ACK 유실/재전송, 완료 멱등, SNAPSHOT_READY 이력 복구",
+    "PASS 조기 종료: 판단 보존·미개봉 문항 빈 배열, 실제 미응답 0점/평균/FAIL 규칙",
   );
 }
 
-async function earlyFinish() {
-  const h = new Harness();
-  await h.onboard();
-  h.checked(await h.c.respond(h.item.assessmentItemId, judgment()));
-  h.checked(await h.c.complete(h.item.assessmentItemId));
-  const currentId = h.item.assessmentItemId;
-  h.loseNextAck = "/finish";
-  assert.equal(await h.c.finish(currentId), false);
-  await h.retryAfterReload();
-  const key = h.lostAttempts.at(-1)!.key!;
-  const duplicate = await h.gateway.finish(
-    h.session.assessmentSessionId,
-    currentId,
-    key,
-  );
-  assert.equal(duplicate.endedAt, h.session.endedAt);
-  assert.equal(h.session.endReason, "USER_FINISHED");
-  assert.deepEqual(
-    h.session.items.map((i) => i.answerStatus),
-    ["ANSWERED", "UNANSWERED", "UNANSWERED"],
-  );
-  const snapshot = await h.sealAndRestore(1);
-  assert.equal(snapshot.payload.items[2].dataDelivered, false);
-  assert.equal(snapshot.payload.items[2].scenarioSummary, null);
-  console.log(
-    "PASS 조기 종료: 응답 보존·현재/미시작 문항 미응답, finish ACK 유실/멱등, 새로고침 복구",
-  );
-}
-
-async function deadlines() {
-  const h = new Harness();
+async function deadlines(base: string) {
+  const h = new PocHarness(base, history);
   await h.onboard();
   const first = h.item.assessmentItemId;
   assert.equal(
     await h.c.complete(first),
     false,
-    "An unanswered item cannot complete early",
+    "A judgment is required to complete early",
   );
-  assert.equal(h.item.ordinal, 1);
   assert.equal(h.runtime.pending, undefined);
-  await advance(179_999);
-  await h.c.sync();
+  await h.advance(179999);
   assert.equal(h.item.ordinal, 1);
   assert.equal(h.item.remainingMs, 1);
-  await advance(1);
+  await h.advance(1);
+  assert.equal(h.item.ordinal, 2);
+  assert.equal(h.session.items[0].closeReason, "TIMEOUT");
   assert.equal(
     await h.c.finish(first),
     false,
-    "A stale finish must not close the new item",
+    "Stale finish must not close the new item",
   );
-  assert.equal(h.item.ordinal, 2);
-  assert.equal(h.session.items[0].answerStatus, "UNANSWERED");
-  assert.equal(h.session.items[0].closeReason, "TIMEOUT");
   assert.equal(
-    await h.c.respond(first, judgment()),
+    await h.c.respond(first, h.judgment()),
     false,
-    "A deadline-expired judgment must be rejected",
+    "Expired judgment must be rejected",
   );
-  h.checked(await h.c.respond(h.item.assessmentItemId, judgment("DOWN")));
-  await advance(180_000);
-  await h.reload();
+  h.checked(await h.c.respond(h.item.assessmentItemId, h.judgment()));
+  await h.advance(180000);
   assert.equal(h.item.ordinal, 3);
-  assert.equal(h.session.items[1].answerStatus, "ANSWERED");
-  assert.equal(h.session.items[1].closeReason, "TIMEOUT");
-  await advance(180_000);
-  await h.reload();
+  await h.advance(180000);
   assert.equal(h.session.status, "ENDED");
-  assert.equal(h.session.answeredQuestionCount, 1);
-  assert.equal(h.session.endReason, "ALL_ITEMS_CLOSED");
-  await h.sealAndRestore(1);
-  const absent = new Harness();
+  assert.deepEqual(
+    h.finalBundle.items.map((i) => [i.completionReason, i.finalElapsedMs]),
+    [
+      ["TIMEOUT", 180000],
+      ["TIMEOUT", 180000],
+      ["TIMEOUT", 180000],
+    ],
+  );
+  assert.deepEqual(
+    h.runtime.evaluation?.itemScores.map((i) => i.itemScore),
+    [0, 100, 0],
+  );
+  h.assertArchived(1);
+
+  const absent = new PocHarness(base, history);
   await absent.onboard();
-  const start = Date.parse(absent.session.startedAt!);
-  await advance(540_000);
-  await absent.reload();
+  await absent.advance(540000);
   assert.equal(absent.session.status, "ENDED");
-  assert.equal(Date.parse(absent.session.endedAt!) - start, 540_000);
+  assert.equal(absent.runtime.evaluation?.totalScore, 0);
   assert.ok(
-    absent.session.items.every(
-      (i) => i.answerStatus === "UNANSWERED" && i.closeReason === "TIMEOUT",
+    absent.finalBundle.items.every(
+      (i) =>
+        i.completionReason === "TIMEOUT" &&
+        i.finalElapsedMs === 180000 &&
+        i.events.length === 0,
     ),
   );
-  await absent.sealAndRestore(0);
+  absent.assertArchived(0);
   console.log(
-    "PASS 시간 경계: 179.999초/180초, 최소 판단 gate, stale finish/판단 거부, 응답·미응답 timeout, 9분 이탈 복구",
+    "PASS 시간 경계: 179.999초/180초, 응답·미응답 timeout, 9분 이탈 시 연속 종료와 실제 최종 bundle 검증",
   );
 }
 
-async function pendingAfterSnapshot() {
-  const h = new Harness();
+async function failedEvaluationRetry(base: string) {
+  const h = new PocHarness(base, history);
   await h.onboard();
-  h.loseNextAck = "/response";
-  assert.equal(await h.c.respond(h.item.assessmentItemId, judgment()), false);
-  await advance(540_000);
+  h.checked(await h.c.respond(h.item.assessmentItemId, h.judgment()));
+  h.loseNextEvaluation = true;
+  assert.equal(await h.c.finish(h.item.assessmentItemId), false);
+  assert.equal(h.session.status, "ENDED");
+  assert.equal(h.runtime.evaluation, undefined);
+  assert.equal(h.runtime.events.length, 1);
+  const frozenBody = h.evaluationRequests[0].body;
+  await h.c.sync();
+  await h.c.sync();
   assert.equal(
-    (await h.gateway.get(h.session.assessmentSessionId)).status,
-    "ENDED",
-  );
-  await seal(h.session.assessmentSessionId);
-  await h.retryAfterReload();
-  assert.equal(
-    h.runtime.events.length,
+    h.evaluationRequests.length,
     1,
-    "An ACK-lost event must recover even after snapshot sealing",
+    "Polling must not silently repeat paid model calls after failure",
   );
-  await h.sealAndRestore(1);
+  assert.ok(h.c.getSnapshot().error);
+  h.checked(await h.c.retry());
+  assert.equal(h.evaluationRequests.length, 2);
+  assert.equal(
+    h.evaluationRequests[1].body,
+    frozenBody,
+    "Explicit retry must submit identical completed evidence",
+  );
+  assert.equal(h.runtime.evaluation?.totalScore, 33.33);
+  h.assertArchived(1);
   console.log(
-    "PASS 종료 후 미확인 요청: SNAPSHOT_READY 뒤에도 기존 eventId 재수신·이력 복구",
+    "PASS 평가 응답 유실: 근거 유지·자동 재호출 차단·명시적 동일 bundle 재시도·기록 중복 없음",
+  );
+}
+
+async function failedSelectionAndUnsafeData(base: string) {
+  const h = new PocHarness(base);
+  h.checked(await h.c.begin());
+  const q = h.runtime.questionnaire!;
+  const survey = {
+    questionnaireVersionId: q.questionnaireVersionId,
+    completedAt: new Date(h.nowMs).toISOString(),
+    answers: q.questions.map((question) => ({
+      questionId: question.id,
+      optionIds: [question.options[0].id],
+    })),
+  };
+  h.failNextSelection = true;
+  assert.equal(await h.c.submit(survey), false);
+  assert.equal(h.runtime.session, undefined);
+  assert.equal(h.c.mode, "api");
+  assert.ok(h.c.getSnapshot().error);
+  h.checked(await h.c.submit(survey));
+  assert.equal(h.session.status, "CREATED");
+  assert.deepEqual(
+    h.calls.map((c) => c.path),
+    [
+      "/v1/poc/questionnaire",
+      "/v1/poc/onboarding-assessment",
+      "/v1/poc/onboarding-assessment",
+    ],
+  );
+
+  const publicMode = new PocHarness(base, new MemoryStorage(), false);
+  publicMode.checked(await publicMode.c.begin());
+  assert.equal(
+    await publicMode.c.submit(survey),
+    false,
+    "Unreviewed source data must be rejected without development opt-in",
+  );
+  assert.equal(publicMode.runtime.session, undefined);
+  assert.equal(publicMode.evaluationRequests.length, 0);
+  console.log(
+    "PASS 선택 실패·공개 방어: 데모/고정 시나리오 fallback 없음, 검수 전 자료 허용은 개발용 명시 설정만",
   );
 }
 
 try {
-  let ready = false;
+  let base: string | undefined;
   for (let attempt = 0; attempt < 200; attempt++) {
-    if (server.exitCode !== null || server.signalCode !== null || !server.pid)
-      throw new Error(`Disposable backend failed to start: ${startupError}`);
-    try {
-      const identity = await control("identity");
-      assert.equal(identity.runId, runId);
-      assert.equal(identity.database, "temporary");
-      ready = true;
-      break;
-    } catch {
-      await delay(100);
+    if (!server.pid || server.exitCode !== null || server.signalCode !== null)
+      throw new Error(
+        `격리 백엔드 실행 실패: ${startupError}\n최신 backend 의존성이 있는 Python을 SAFE_T_TEST_PYTHON으로 지정하세요.`,
+      );
+    if (announcedBase) {
+      try {
+        await verifyDisposableBackend(announcedBase, runId);
+        base = announcedBase;
+        break;
+      } catch {
+        /* Startup may announce before Uvicorn is ready. */
+      }
     }
+    await delay(100);
   }
-  assert.ok(ready, `Disposable backend was not ready: ${startupError}`);
-  await fullLifecycle();
-  await earlyFinish();
-  await deadlines();
-  await pendingAfterSnapshot();
+  assert.ok(base, `격리 백엔드 준비 시간 초과: ${startupError}`);
+  await runApiSmoke(base, runId, history);
+  await earlyFinish(base);
+  await deadlines(base);
+  await failedEvaluationRetry(base);
+  await failedSelectionAndUnsafeData(base);
   assert.equal(
     readHistory(history).length,
     5,
-    "Completed sessions accumulate without replacing older history",
+    "Completed assessments accumulate without replacement",
   );
   console.log(
-    "PASS 격리된 실제 API 통합 검증 전체 완료: 5세션, 기존 개발 DB 변경 없음",
+    "PASS stateless 백엔드 통합 전체 완료: 5개 종료 기록, OpenAI 호출·DB·기존 서버 변경 없음",
   );
 } finally {
-  if (server.exitCode === null && server.signalCode === null && server.pid) {
+  lines.close();
+  if (server.pid && server.exitCode === null && server.signalCode === null) {
     const closed = once(server, "close");
     server.kill("SIGTERM");
     const stopped = await Promise.race([

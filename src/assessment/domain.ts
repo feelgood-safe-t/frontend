@@ -130,9 +130,12 @@ export function appendEvent(events: TimelineEvent[], entry: TimelineEvent) {
   return [...events, entry].sort((a, b) => a.event.sequence - b.event.sequence);
 }
 export function assertParticipantSafe(session: Session, allowRaw: boolean) {
-  const state = session.currentItem?.scenario.sourceState;
+  if (session.currentItem)
+    assertScenarioSafe(session.currentItem.scenario, allowRaw);
+}
+export function assertScenarioSafe(scenario: Scenario, allowRaw: boolean) {
+  const state = scenario.sourceState;
   if (
-    session.currentItem &&
     !allowRaw &&
     (!state ||
       !state.participantSafe ||

@@ -8,9 +8,11 @@ import {
 export function BehaviorTimeline({
   events,
   session,
+  showItem = true,
 }: {
   events: TimelineEvent[];
   session: Session;
+  showItem?: boolean;
 }) {
   if (!events.length)
     return (
@@ -27,13 +29,19 @@ export function BehaviorTimeline({
               #{entry.event.sequence}
             </span>
             <span className="text-xs">
-              문항{" "}
-              {
-                session.items.find(
-                  (i) => i.assessmentItemId === entry.event.assessmentItemId,
-                )?.ordinal
-              }{" "}
-              · {marketLabel(entry.event.marketOffsetMs)}
+              {showItem && (
+                <>
+                  문항{" "}
+                  {
+                    session.items.find(
+                      (i) =>
+                        i.assessmentItemId === entry.event.assessmentItemId,
+                    )?.ordinal
+                  }{" "}
+                  ·{" "}
+                </>
+              )}
+              {marketLabel(entry.event.marketOffsetMs)}
             </span>
             {entry.kind === "judgment" ? (
               <strong

@@ -2,6 +2,11 @@ import type {
   OnboardingQuestion,
   OnboardingSurveyResult,
 } from "../onboardingTypes";
+import type {
+  EvaluationResult,
+  OnboardingAssessment,
+  ProfileAnalysis,
+} from "./pocTypes";
 
 export type Direction = "UP" | "DOWN";
 export type Confidence = "LOW" | "MEDIUM" | "HIGH";
@@ -28,6 +33,9 @@ export interface Candle {
   phase: "PRE_ROLL" | "ASSESSMENT";
 }
 export interface News {
+  sourceType?: string;
+  informationRole?: string;
+  isSimulationContent?: boolean;
   isMockRawSource?: boolean;
   contentId: string;
   title: string;
@@ -124,9 +132,11 @@ export interface RecordSnapshot {
   survey: OnboardingSurveyResult | null;
   events: TimelineEvent[];
   itemInfo: Record<string, ItemInfo>;
+  evaluation?: EvaluationResult;
+  profileAnalysis?: ProfileAnalysis;
 }
 export interface Gateway {
-  guest(): Promise<Participant>;
+  guest?(): Promise<Participant>;
   questionnaire(): Promise<Questionnaire>;
   survey(
     result: OnboardingSurveyResult,
@@ -144,4 +154,6 @@ export interface Gateway {
   ): Promise<{ event: ContentView; content: News }>;
   complete(id: string, itemId: string, key: string): Promise<Session>;
   finish(id: string, itemId: string, key: string): Promise<Session>;
+  evaluate?(id: string): Promise<EvaluationResult>;
+  onboarding?(): OnboardingAssessment | undefined;
 }

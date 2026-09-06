@@ -7,8 +7,10 @@
   }
 
   body {
-    font-family: "Gulim", "굴림", "Malgun Gothic", "맑은 고딕", "Dotum", "돋움", "Courier New", monospace, sans-serif;
-    background-color: #F0F0F0;
+    font-family:
+      "Gulim", "굴림", "Malgun Gothic", "맑은 고딕", "Dotum", "돋움",
+      "Courier New", monospace, sans-serif;
+    background-color: #f0f0f0;
     color: #000000;
     -webkit-font-smoothing: antialiased;
     letter-spacing: -0.2px;
@@ -17,37 +19,37 @@
 
 /* Authentic CBT Graph Paper grid */
 .cbt-grid-bg {
-  background-color: #FFFFFF;
-  background-image: 
-    linear-gradient(to right, #E8EEF5 1px, transparent 1px),
-    linear-gradient(to bottom, #E8EEF5 1px, transparent 1px);
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(to right, #e8eef5 1px, transparent 1px),
+    linear-gradient(to bottom, #e8eef5 1px, transparent 1px);
   background-size: 20px 20px;
 }
 
 /* Classic Windows / CBT 3D Bevel effect (rigid 1px flat bevel or flat solid) */
 .cbt-panel {
-  background-color: #FFFFFF;
+  background-color: #ffffff;
   border: 1px solid #000000;
 }
 
 .cbt-bevel-box {
-  background-color: #F0F0F0;
-  border-top: 1px solid #DFDFDF;
-  border-left: 1px solid #DFDFDF;
+  background-color: #f0f0f0;
+  border-top: 1px solid #dfdfdf;
+  border-left: 1px solid #dfdfdf;
   border-right: 1px solid #808080;
   border-bottom: 1px solid #808080;
 }
 
 .cbt-bevel-sunken {
-  background-color: #FFFFFF;
+  background-color: #ffffff;
   border-top: 1px solid #808080;
   border-left: 1px solid #808080;
-  border-right: 1px solid #FFFFFF;
-  border-bottom: 1px solid #FFFFFF;
+  border-right: 1px solid #ffffff;
+  border-bottom: 1px solid #ffffff;
 }
 
 .cbt-btn {
-  background-color: #E6E6E6;
+  background-color: #e6e6e6;
   border: 1px solid #000000;
   color: #000000;
   font-weight: bold;
@@ -56,7 +58,7 @@
 }
 
 .cbt-btn:active {
-  background-color: #CCCCCC;
+  background-color: #cccccc;
 }
 
 /* Scrollbar styling for retro CBT look */
@@ -66,15 +68,38 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #F0F0F0;
+  background: #f0f0f0;
   border: 1px solid #999999;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #C0C0C0;
+  background: #c0c0c0;
   border: 1px solid #000000;
 }
 
 ::-webkit-scrollbar-thumb:active {
   background: #999999;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .certificate-print-root,
+  .certificate-print-root * {
+    visibility: visible;
+  }
+
+  .certificate-print-root {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    min-height: 100vh;
+    background: #ffffff;
+  }
+
+  .certificate-actions {
+    display: none !important;
+  }
 }

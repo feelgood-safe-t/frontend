@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { AssessmentController } from "../src/assessment/controller";
-import { demoScenario } from "../src/assessment/demo";
+import { demoScenario, DEMO_STORAGE_KEY } from "../src/assessment/demo";
 import {
   emptyRuntime,
   HISTORY_KEY,
@@ -124,10 +124,9 @@ function record(session = terminal()): RecordSnapshot {
 function storageHarness() {
   const temporary = new MemoryStorage();
   const persistent = new MemoryStorage();
-  const base = "https://storage-recovery.example.invalid";
   const initial = record();
   temporary.setItem(
-    `safe-t:runtime:v2:${base}`,
+    "safe-t:runtime:v2:demo",
     JSON.stringify({
       ...emptyRuntime(),
       participant: { participantId: "storage-participant" },
@@ -137,20 +136,24 @@ function storageHarness() {
       itemInfo: initial.itemInfo,
     }),
   );
-  const fetcher: typeof fetch = async (_url, options) => {
-    assert.equal(options?.method, "GET");
-    return new Response(JSON.stringify(initial.session));
-  };
+  // Storage recovery belongs to legacy/demo mode; API 0.7 progress is memory-only.
+  persistent.setItem(
+    DEMO_STORAGE_KEY,
+    JSON.stringify({
+      sessions: {
+        [initial.id]: {
+          session: initial.session,
+          nextSequence: 2,
+          receipts: {},
+        },
+      },
+      creations: {},
+    }),
+  );
   return {
     temporary,
     persistent,
-    controller: new AssessmentController(
-      base,
-      temporary,
-      persistent,
-      false,
-      fetcher,
-    ),
+    controller: new AssessmentController("", temporary, persistent, false),
   };
 }
 

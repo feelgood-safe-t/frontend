@@ -26,14 +26,12 @@ import {
   buttonClass,
   secondaryClass,
   Panel,
+  RadialLoader,
   Rules,
 } from "./components/AssessmentLayout";
-import {
-  AssessmentResults,
-  RubricTable,
-  SampleReport,
-} from "./components/AssessmentResults";
+import { AssessmentResults, RubricHelp } from "./components/AssessmentResults";
 import { OnboardingSurvey } from "./components/OnboardingSurvey";
+import { ProfileAnalysis } from "./components/ProfileAnalysis";
 
 function StoredRecord({
   records,
@@ -108,7 +106,37 @@ export default function RootFlow() {
     } catch {
       setHistoryError("일부 평가 기록을 읽을 수 없습니다.");
     }
-  }, [location.pathname, session?.endedAt, session?.status, runtime.events]);
+  }, [
+    location.pathname,
+    session?.endedAt,
+    session?.status,
+    runtime.events,
+    runtime.evaluation,
+  ]);
+  useEffect(() => {
+    const unfinished =
+      session?.status === "ACTIVE" ||
+      session?.status === "CREATED" ||
+      (controller.mode === "api" &&
+        isSessionEnded(session?.status) &&
+        !runtime.evaluation);
+    const unsavedResult = Boolean(
+      storageError && isSessionEnded(session?.status),
+    );
+    if (!unfinished && !busy && !unsavedResult) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [
+    session?.status,
+    runtime.evaluation,
+    busy,
+    controller.mode,
+    storageError,
+  ]);
   useEffect(() => {
     void controller.sync();
   }, [controller, runtime.sessionId]);
@@ -148,6 +176,8 @@ export default function RootFlow() {
           survey: runtime.survey ?? null,
           events: runtime.events,
           itemInfo: runtime.itemInfo,
+          evaluation: runtime.evaluation,
+          profileAnalysis: runtime.profileAnalysis,
         }
       : undefined;
   const landing = (
@@ -187,14 +217,14 @@ export default function RootFlow() {
           ) : active ? (
             <button
               disabled={busy}
-              className={buttonClass}
+              className={buttonClass + " !border"}
               onClick={() =>
-                navigate(session.status === "ACTIVE" ? "/exam" : "/ready")
+                navigate(session.status === "ACTIVE" ? "/exam" : "/analysis")
               }
             >
               {session.status === "ACTIVE"
                 ? "진행 중인 평가 이어하기"
-                : "준비된 평가 시작하기"}
+                : "설문 분석 결과 이어보기"}
             </button>
           ) : (
             <button
@@ -224,27 +254,55 @@ export default function RootFlow() {
               작성 중인 설문 이어하기
             </button>
           )}
-          <button
-            className={secondaryClass}
-            onClick={() => navigate("/sample")}
-          >
-            샘플 보고서 보기
-          </button>
+          {controller.mode === "api" &&
+            isSessionEnded(session?.status) &&
+            !runtime.evaluation && (
+              <button
+                className={secondaryClass}
+                onClick={() => navigate("/exam")}
+              >
+                {state.evaluating
+                  ? "평가 분석 진행 보기"
+                  : "평가 결과 다시 요청"}
+              </button>
+            )}
         </div>
-        <p className="mt-4 text-xs text-gray-500">포지션·거래 모드 · 준비 중</p>
       </Panel>
       {(records.length > 0 || legacy.length > 0) && (
-        <Panel title="지금까지의 평가 기록">
-          <ul className="divide-y divide-gray-300">
+        <section
+          aria-labelledby="assessment-history-title"
+          className="mx-4 pt-2 sm:mx-5"
+        >
+          <div className="flex items-end justify-between gap-3 pb-3">
+            <h2 id="assessment-history-title" className="text-lg font-black">
+              지금까지의 평가 기록
+            </h2>
+            <span className="text-xs text-gray-500">
+              {records.length + legacy.length}건
+            </span>
+          </div>
+          <ul className="divide-y divide-gray-300 border-t border-gray-400">
             {records.map((record) => (
               <li
                 key={record.id}
                 className="py-3 flex flex-wrap gap-3 items-center justify-between"
               >
                 <div>
-                  <p className="font-bold text-sm">
-                    3문항 판단 평가 ·{" "}
-                    {record.mode === "demo" ? "데모" : "제출 완료"}
+                  <p className="flex flex-wrap items-center gap-1.5 text-sm font-bold">
+                    <span>3문항 판단 평가</span>
+                    <span className="text-gray-400">·</span>
+                    <span>
+                      {record.mode === "demo"
+                        ? "데모"
+                        : record.evaluation
+                          ? `${record.evaluation.totalScore}점`
+                          : "판단 기록"}
+                    </span>
+                    {record.mode !== "demo" && record.evaluation?.passed && (
+                      <span className="border border-green-700 bg-green-100 px-1.5 py-0.5 text-[10px] font-black text-green-800">
+                        PASS
+                      </span>
+                    )}
                   </p>
                   <p className="text-xs mt-1 text-gray-600">
                     {new Date(record.session.endedAt!).toLocaleString("ko-KR")}{" "}
@@ -252,7 +310,7 @@ export default function RootFlow() {
                   </p>
                 </div>
                 <button
-                  className={secondaryClass}
+                  className="border border-gray-500 bg-transparent px-2.5 py-1 text-[11px] font-medium text-gray-700 hover:border-black hover:text-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#004080]"
                   onClick={() =>
                     navigate(`/record/${encodeURIComponent(record.id)}`)
                   }
@@ -307,11 +365,11 @@ export default function RootFlow() {
               </li>
             ))}
           </ul>
-          <p className="text-xs mt-3 text-gray-600">
+          <p className="border-t border-gray-300 pt-3 text-xs text-gray-600">
             이전 평가의 원본 기록은 유지됩니다. 개정 전 점수는 현재 평가 기준과
             비교하지 않습니다.
           </p>
-        </Panel>
+        </section>
       )}
       {historyError && (
         <p role="alert" className="text-red-700">
@@ -320,30 +378,51 @@ export default function RootFlow() {
       )}
     </AssessmentLayout>
   );
+  const analysis = (
+    <AssessmentLayout onHome={home} mode={controller.mode}>
+      {runtime.profileAnalysis ? (
+        <ProfileAnalysis profile={runtime.profileAnalysis} />
+      ) : (
+        <Panel title="설문 분석 결과">
+          <p className="text-sm leading-7">
+            설문 응답을 반영해 세 가지 평가 문항을 준비했습니다.
+          </p>
+        </Panel>
+      )}
+      <div className="flex justify-end">
+        <button className={buttonClass} onClick={() => navigate("/ready")}>
+          평가 진행 →
+        </button>
+      </div>
+    </AssessmentLayout>
+  );
   const ready = (
     <AssessmentLayout onHome={home} mode={controller.mode}>
       <Panel title="평가 준비 완료">
-        <h1 className="text-2xl font-black">세 가지 시장 상황을 살펴보세요.</h1>
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="text-2xl font-black">
+            세 가지 시장 상황을 살펴보세요.
+          </h1>
+          <RubricHelp passThreshold={70} />
+        </div>
         <p className="mt-3 text-sm">
           한 번에 한 문항씩 공개됩니다. 시작 버튼을 누르면 첫 문항의 3분
           타이머가 시작됩니다.
         </p>
+        {controller.mode === "api" && (
+          <p className="mt-3 text-xs text-gray-600">
+            진행 중 새로고침하면 시험이 초기화됩니다. 완료된 결과는 평가 기록에
+            보관됩니다.
+          </p>
+        )}
         <div className="mt-5">
           <Rules />
         </div>
       </Panel>
-      <Panel title="이렇게 평가합니다">
-        <RubricTable />
-        <p className="text-xs mt-3 leading-6">
-          근거 태그와 확신도는 필수이며, 직접 설명은 선택입니다. 설문 응답과
-          실제 판단의 연결도 평가합니다. 문항 하나라도 미응답이면 통과할 수
-          없습니다.
-        </p>
-      </Panel>
       <div className="flex justify-end">
         <button
           disabled={busy}
-          className={buttonClass}
+          className={buttonClass + " !border"}
           onClick={async () => {
             if (await controller.start()) navigate("/exam");
           }}
@@ -388,6 +467,32 @@ export default function RootFlow() {
   else if (currentRecord)
     exam = (
       <AssessmentLayout onHome={home} mode={controller.mode}>
+        {controller.mode === "api" && !runtime.evaluation && (
+          <Panel
+            title={
+              state.evaluating
+                ? "판단 과정을 분석하고 있습니다"
+                : "평가 결과를 다시 요청해 주세요"
+            }
+          >
+            {state.evaluating ? (
+              <RadialLoader label="판단 과정 분석 중" />
+            ) : (
+              <p role="status" className="text-sm leading-7">
+                판단 기록은 유지되어 있습니다. 같은 기록으로 평가를 다시 요청할
+                수 있습니다.
+              </p>
+            )}
+            {!busy && (
+              <button
+                className={buttonClass + " mt-4"}
+                onClick={() => void controller.retry()}
+              >
+                평가 다시 요청
+              </button>
+            )}
+          </Panel>
+        )}
         <AssessmentResults record={currentRecord} />
         <div className="flex flex-wrap gap-2">
           <button className={buttonClass} onClick={home}>
@@ -403,18 +508,15 @@ export default function RootFlow() {
           >
             새 평가 시작
           </button>
-          <button
-            className={secondaryClass}
-            onClick={() => navigate("/sample")}
-          >
-            샘플 보고서 보기
-          </button>
         </div>
       </AssessmentLayout>
     );
   else
     exam = (
-      <Navigate to={session?.status === "CREATED" ? "/ready" : "/"} replace />
+      <Navigate
+        to={session?.status === "CREATED" ? "/analysis" : "/"}
+        replace
+      />
     );
   return (
     <>
@@ -459,11 +561,24 @@ export default function RootFlow() {
                 isSubmitting={busy}
                 error={error}
                 onComplete={async (result) => {
-                  if (await controller.submit(result)) navigate("/ready");
+                  if (await controller.submit(result)) navigate("/analysis");
                 }}
               />
             ) : (
-              <Navigate to={runtime.sessionId ? "/exam" : "/"} replace />
+              <Navigate
+                to={session?.status === "CREATED" ? "/analysis" : "/exam"}
+                replace
+              />
+            )
+          }
+        />
+        <Route
+          path="/analysis"
+          element={
+            session?.status === "CREATED" ? (
+              analysis
+            ) : (
+              <Navigate to={session ? "/exam" : "/"} replace />
             )
           }
         />
@@ -477,7 +592,7 @@ export default function RootFlow() {
             )
           }
         />
-        <Route path="/matching" element={<Navigate to="/ready" replace />} />
+        <Route path="/matching" element={<Navigate to="/analysis" replace />} />
         <Route path="/exam" element={exam} />
         <Route
           path="/record/:recordId"
@@ -497,14 +612,6 @@ export default function RootFlow() {
               mode={controller.mode}
               onHome={home}
             />
-          }
-        />
-        <Route
-          path="/sample"
-          element={
-            <AssessmentLayout onHome={home} mode={controller.mode}>
-              <SampleReport />
-            </AssessmentLayout>
           }
         />
         <Route path="*" element={<Navigate to="/" replace />} />

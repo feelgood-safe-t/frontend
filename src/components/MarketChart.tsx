@@ -70,8 +70,7 @@ export function MarketChart({ candles }: { candles: Candle[] }) {
                   onMouseLeave={() => setSelected(null)}
                 >
                   <title>
-                    {marketLabel(c.marketOffsetMs)}: 시가 {c.open}, 고가{" "}
-                    {c.high}, 저가 {c.low}, 종가 {c.close}, 거래량 {c.volume}
+                    {`${marketLabel(c.marketOffsetMs)}: 시가 ${c.open}, 고가 ${c.high}, 저가 ${c.low}, 종가 ${c.close}, 거래량 ${c.volume}`}
                   </title>
                   <rect
                     x={x - slot / 2}
