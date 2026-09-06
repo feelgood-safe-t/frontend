@@ -5,6 +5,7 @@ import {
 import { ApiError } from "./api";
 import { validateJudgment, visibleMarket } from "./domain";
 import type { CurrentItem, Gateway, Scenario, Session } from "./types";
+import { createUuid } from "./uuid";
 
 export const DEMO_STORAGE_KEY = "safe-t:demo-engine:v2";
 const copy = <T>(value: T): T => structuredClone(value);
@@ -234,7 +235,7 @@ export function createDemoGateway(storage: Storage, clock = Date.now): Gateway {
   return {
     async guest() {
       return {
-        participantId: `demo-${crypto.randomUUID()}`,
+        participantId: `demo-${createUuid()}`,
         accessToken: "demo",
       };
     },
@@ -250,7 +251,7 @@ export function createDemoGateway(storage: Storage, clock = Date.now): Gateway {
     async create(surveyId, key) {
       const db = read();
       if (db.creations[key]) return db.creations[key];
-      const id = `demo-${crypto.randomUUID()}`;
+      const id = `demo-${createUuid()}`;
       db.creations[key] = id;
       db.sessions[id] = newDemoState(id, clock());
       save(db);
@@ -287,7 +288,7 @@ export function createDemoGateway(storage: Storage, clock = Date.now): Gateway {
           });
           return {
             ...body,
-            eventId: `event-${crypto.randomUUID()}`,
+            eventId: `event-${createUuid()}`,
             sequence: s.nextSequence++,
             assessmentItemId: itemId,
             recordedAt: s.session.serverNow,
@@ -311,7 +312,7 @@ export function createDemoGateway(storage: Storage, clock = Date.now): Gateway {
             content,
             event: {
               ...body,
-              eventId: `event-${crypto.randomUUID()}`,
+              eventId: `event-${createUuid()}`,
               sequence: s.nextSequence++,
               assessmentItemId: itemId,
               recordedAt: s.session.serverNow,

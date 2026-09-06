@@ -16,7 +16,7 @@ npm run dev
 API 주소가 없으면 데모로 실행됩니다. 실제 연동은 `.env.development.local`에 아래 값을 설정하고 개발 서버를 재시작합니다.
 
 ```dotenv
-VITE_SAFE_T_API_BASE_URL=http://47.129.245.75:8000
+VITE_SAFE_T_API_BASE_URL=https://api.bluemountainnono.monerujo.ai
 ```
 
 프로덕션 빌드도 `.env.production`에 설정된 같은 공개 테스트 API를 사용합니다.

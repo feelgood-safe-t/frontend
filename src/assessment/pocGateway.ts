@@ -11,6 +11,7 @@ import type {
 } from "./pocTypes";
 import { assertScenarioSafe, validateJudgment, visibleMarket } from "./domain";
 import type { CurrentItem, Gateway, Session } from "./types";
+import { createUuid } from "./uuid";
 
 /** Local UI adapter. IDs, receipts and timers never go to the stateless backend. */
 export function createPocGateway(
@@ -145,7 +146,7 @@ export function createPocGateway(
       for (const item of selected.assessment.items)
         assertScenarioSafe(item.scenario, allowRaw);
       onboarding = copy(selected);
-      const id = `poc-${crypto.randomUUID()}`;
+      const id = `poc-${createUuid()}`;
       session = {
         assessmentSessionId: id,
         status: "CREATED",
@@ -229,7 +230,7 @@ export function createPocGateway(
         });
         return {
           ...body,
-          eventId: crypto.randomUUID(),
+          eventId: createUuid(),
           sequence,
           assessmentItemId: itemId,
           recordedAt: new Date(lastNow).toISOString(),
@@ -259,7 +260,7 @@ export function createPocGateway(
           content,
           event: {
             ...body,
-            eventId: crypto.randomUUID(),
+            eventId: createUuid(),
             sequence,
             assessmentItemId: itemId,
             recordedAt: new Date(lastNow).toISOString(),

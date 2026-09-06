@@ -67,6 +67,12 @@ export default function App({
       e.kind === "judgment" &&
       e.event.assessmentItemId === item.assessmentItemId,
   );
+  const newestNews = [...market.news].sort(
+    (a, b) =>
+      b.marketOffsetMs - a.marketOffsetMs ||
+      b.availableAtOffsetMs - a.availableAtOffsetMs ||
+      b.contentId.localeCompare(a.contentId),
+  );
   return (
     <AssessmentLayout
       onHome={onHome}
@@ -95,8 +101,11 @@ export default function App({
           <h1 className="font-black text-xl">
             {item.scenario.asset.displayName}
           </h1>
+          <p className="mt-0.5 text-xs font-bold text-gray-700">
+            가명 위험자산
+          </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-3">
           <div className="text-right">
             <p className="text-xs">문항 남은 시간</p>
             <strong
@@ -106,13 +115,22 @@ export default function App({
               {formatRemaining(remainingMs)}
             </strong>
           </div>
-          <button
-            className={secondaryClass}
-            disabled={busy || pending}
-            onClick={() => setFinish(true)}
-          >
-            시험 종료
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              className={`${buttonClass} whitespace-nowrap`}
+              disabled={disabled || !item.scoreEligible}
+              onClick={() => void controller.complete(item.assessmentItemId)}
+            >
+              문항 완료
+            </button>
+            <button
+              className={`${secondaryClass} whitespace-nowrap`}
+              disabled={busy || pending}
+              onClick={() => setFinish(true)}
+            >
+              시험 종료
+            </button>
+          </div>
         </div>
       </section>
       <ol aria-label="문항 진행 상태" className="grid grid-cols-3 gap-2">
@@ -194,9 +212,9 @@ export default function App({
               공개된 뉴스 본문을 바로 확인할 수 있습니다. 읽음 표시를 누르면
               해당 뉴스의 열람 기록이 저장됩니다.
             </p>
-            {market.news.length ? (
+            {newestNews.length ? (
               <ul className="space-y-2">
-                {market.news.map((content) => {
+                {newestNews.map((content) => {
                   const viewed = events.some(
                     (entry) =>
                       entry.kind === "view" &&
@@ -251,38 +269,15 @@ export default function App({
         </div>
         <aside className="min-w-0 lg:sticky lg:top-24 lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto">
           <Panel title="판단 입력">
-            <div className="flex flex-wrap justify-between gap-2 text-sm mb-3">
-              <p>
-                현재까지 판단{" "}
-                <strong>
-                  {Math.max(item.responseCount, judgments.length)}회
-                </strong>
-                {item.latestDirection &&
-                  ` · 최근 ${item.latestDirection === "UP" ? "▲ 상승" : "▼ 하락"}`}
-              </p>
-              <span className="text-gray-600">
-                새 정보를 확인하고 판단을 추가할 수 있습니다.
-              </span>
-            </div>
             <JudgmentPanel
               item={item}
               controller={controller}
+              judgmentCount={Math.max(item.responseCount, judgments.length)}
               busy={busy}
               pending={pending}
               error={error}
               expired={expired}
             />
-            <div className="border-t border-gray-300 mt-4 pt-4">
-              <button
-                disabled={disabled || !item.scoreEligible}
-                onClick={() => void controller.complete(item.assessmentItemId)}
-                className={buttonClass + " w-full"}
-              >
-                {item.ordinal === 3
-                  ? "문항 완료·평가 제출"
-                  : "문항 완료 / 다음 →"}
-              </button>
-            </div>
             {expired && (
               <p role="status" className="text-sm mt-2">
                 시간이 만료되어 다음 진행 상태를 확인하고 있습니다.

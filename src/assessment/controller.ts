@@ -18,6 +18,7 @@ import {
 } from "./storage";
 import type { Gateway, JudgmentInput, RecordSnapshot, Session } from "./types";
 import type { OnboardingSurveyResult } from "../onboardingTypes";
+import { createUuid } from "./uuid";
 
 interface State {
   runtime: Runtime;
@@ -28,6 +29,29 @@ interface State {
   restored: boolean;
   evaluating: boolean;
 }
+
+function errorDetails(error: unknown) {
+  const details: {
+    name: string;
+    message: string;
+    status?: number;
+    code?: string;
+  } = {
+    name: error instanceof Error ? error.name : typeof error,
+    message:
+      error instanceof Error
+        ? error.message
+        : "알 수 없는 값이 예외로 전달됐습니다.",
+  };
+  if (error && typeof error === "object") {
+    if ("status" in error && typeof error.status === "number")
+      details.status = error.status;
+    if ("code" in error && typeof error.code === "string")
+      details.code = error.code;
+  }
+  return details;
+}
+
 export class AssessmentController {
   private listeners = new Set<() => void>();
   private gateway: Gateway;
@@ -181,7 +205,7 @@ export class AssessmentController {
       return false;
     }
   }
-  private async run(fn: () => Promise<void>) {
+  private async run(action: string, fn: () => Promise<void>) {
     if (this.state.busy) return false;
     this.revision++;
     this.patch({ busy: true, error: "" });
@@ -190,6 +214,19 @@ export class AssessmentController {
       await this.evaluateCompleted();
       return true;
     } catch (e) {
+      console.error(
+        `[청노][${action}] 처리 실패`,
+        {
+          ...errorDetails(e),
+          mode: this.mode,
+          hasQuestionnaire: Boolean(this.state.runtime.questionnaire),
+          hasSurveyId: Boolean(this.state.runtime.surveyId),
+          hasSessionId: Boolean(this.state.runtime.sessionId),
+          sessionStatus: this.state.runtime.session?.status ?? null,
+          pendingKind: this.state.runtime.pending?.kind ?? null,
+        },
+        e,
+      );
       this.patch({
         error:
           e instanceof Error
@@ -222,12 +259,12 @@ export class AssessmentController {
     }
   }
   begin = () =>
-    this.run(async () => {
+    this.run("QUESTIONNAIRE_LOAD", async () => {
       this.persist({ questionnaire: await this.gateway.questionnaire() });
     });
   saveDraft = (draft: Record<string, string[]>) => this.persist({ draft });
   submit = (survey: OnboardingSurveyResult) =>
-    this.run(async () => {
+    this.run("SURVEY_SUBMIT", async () => {
       const old = this.state.runtime;
       if (!old.questionnaire) throw new Error("먼저 설문을 시작해 주세요.");
       if (
@@ -240,8 +277,8 @@ export class AssessmentController {
           surveyId: undefined,
           sessionId: undefined,
           session: undefined,
-          surveyKey: crypto.randomUUID(),
-          createKey: crypto.randomUUID(),
+          surveyKey: createUuid(),
+          createKey: createUuid(),
           events: [],
           itemInfo: {},
           evaluation: undefined,
@@ -278,7 +315,7 @@ export class AssessmentController {
       this.accept(await this.gateway.get(this.state.runtime.sessionId!));
     });
   start = () =>
-    this.run(async () => {
+    this.run("ASSESSMENT_START", async () => {
       const id = this.state.runtime.sessionId;
       if (!id) throw new Error("설문을 먼저 완료해 주세요.");
       this.accept(await this.gateway.start(id));
@@ -301,9 +338,10 @@ export class AssessmentController {
             !this.state.runtime.evaluation &&
             !this.evaluationAttempted
           )
-            await this.run(async () => {});
+            await this.run("EVALUATION_REQUEST", async () => {});
         }
       } catch (e) {
+        console.error("[청노][SESSION_SYNC] 처리 실패", errorDetails(e), e);
         if (revision === this.revision)
           this.patch({
             error: e instanceof Error ? e.message : "연결을 확인해 주세요.",
@@ -377,7 +415,7 @@ export class AssessmentController {
     this.accept(await this.gateway.get(id));
   };
   command = (command: Command) =>
-    this.run(async () => {
+    this.run(`ASSESSMENT_${command.kind.toUpperCase()}`, async () => {
       if (this.state.runtime.pending)
         throw new Error("이전 요청의 처리 결과를 먼저 확인해 주세요.");
       this.persist({ pending: command });
@@ -385,22 +423,18 @@ export class AssessmentController {
     });
   respond = (itemId: string, body: JudgmentInput) =>
     this.command({ kind: "respond", itemId, body: validateJudgment(body) });
-  view = (
-    itemId: string,
-    contentId: string,
-    clientEventId = crypto.randomUUID(),
-  ) =>
+  view = (itemId: string, contentId: string, clientEventId = createUuid()) =>
     this.command({
       kind: "view",
       itemId,
       body: { contentId, clientEventId },
     });
   complete = (itemId: string) =>
-    this.command({ kind: "complete", itemId, key: crypto.randomUUID() });
+    this.command({ kind: "complete", itemId, key: createUuid() });
   finish = (itemId: string) =>
-    this.command({ kind: "finish", itemId, key: crypto.randomUUID() });
+    this.command({ kind: "finish", itemId, key: createUuid() });
   retry = () =>
-    this.run(async () => {
+    this.run("ASSESSMENT_RETRY", async () => {
       this.evaluationAttempted = false;
       const p = this.state.runtime.pending;
       if (p) await this.send(p);

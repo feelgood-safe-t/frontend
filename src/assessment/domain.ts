@@ -135,14 +135,22 @@ export function assertParticipantSafe(session: Session, allowRaw: boolean) {
 }
 export function assertScenarioSafe(scenario: Scenario, allowRaw: boolean) {
   const state = scenario.sourceState;
-  if (
-    !allowRaw &&
-    (!state ||
-      !state.participantSafe ||
-      !state.anonymized ||
-      !state.normalized ||
-      state.mockRawSource)
-  ) {
+  const failedChecks = !state
+    ? ["sourceState 누락"]
+    : [
+        !state.participantSafe && "participantSafe=false",
+        !state.anonymized && "anonymized=false",
+        !state.normalized && "normalized=false",
+        state.mockRawSource && "mockRawSource=true",
+      ].filter((reason): reason is string => Boolean(reason));
+  if (!allowRaw && failedChecks.length) {
+    console.error("[청노][SCENARIO_SAFETY] 공개용 평가 자료 차단", {
+      scenarioType: scenario.scenarioType,
+      assetId: scenario.asset.assetId,
+      allowRaw,
+      failedChecks,
+      sourceState: state ?? null,
+    });
     throw new Error(
       "공개용 평가 자료를 준비하고 있습니다. 잠시 후 다시 이용해 주세요.",
     );

@@ -139,6 +139,7 @@ test("actual evaluation renders compact item tabs and only the selected item's f
   assert.match(html, /border px-1 py-2[^\"]*sm:p-2/);
   assert.match(html, /판단·뉴스 열람/);
   assert.match(html, /과정 평가 기준 보기/);
+  assert.doesNotMatch(html, /평가 버전 정보/);
   assert.doesNotMatch(
     html,
     /전체 판단·뉴스 열람 타임라인|판단 과정 분석이 완료됐습니다|분석 결과는 아직 제공되지|인증 코드 SAMPLE/,

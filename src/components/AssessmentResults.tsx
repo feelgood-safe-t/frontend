@@ -57,7 +57,6 @@ export function AssessmentResults({ record }: { record: RecordSnapshot }) {
             }
           />
           <EvaluationTabs record={record} evaluation={evaluation} />
-          <EvaluationVersions evaluation={evaluation} />
           {certificateOpen && evaluation.passArtifact && (
             <CertificateDialog
               artifact={evaluation.passArtifact}
@@ -451,27 +450,5 @@ function CertificateDialog({
         </button>
       </div>
     </Dialog>
-  );
-}
-
-function EvaluationVersions({ evaluation }: { evaluation: EvaluationResult }) {
-  return (
-    <details className="border border-gray-400 bg-white p-4 text-xs">
-      <summary className="cursor-pointer font-bold">평가 버전 정보</summary>
-      <dl className="mt-3 space-y-2 break-all">
-        {[
-          ["평가 기준", evaluation.rubricVersion],
-          ["평가 프롬프트", evaluation.promptVersion],
-          ["모델", evaluation.modelVersion],
-          ["결과 규칙", evaluation.resultRuleVersion],
-          ["평가 입력 해시", evaluation.snapshotHash],
-        ].map(([label, value]) => (
-          <div key={label}>
-            <dt className="font-bold">{label}</dt>
-            <dd className="mt-1 font-mono">{value}</dd>
-          </div>
-        ))}
-      </dl>
-    </details>
   );
 }

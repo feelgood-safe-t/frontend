@@ -12,11 +12,13 @@ import {
   REASON_LABELS,
   validateJudgment,
 } from "../assessment/domain";
+import { createUuid } from "../assessment/uuid";
 import { buttonClass, secondaryClass } from "./AssessmentLayout";
 
 export function JudgmentPanel({
   item,
   controller,
+  judgmentCount = item.responseCount,
   busy,
   pending,
   error,
@@ -24,6 +26,7 @@ export function JudgmentPanel({
 }: {
   item: CurrentItem;
   controller: AssessmentController;
+  judgmentCount?: number;
   busy: boolean;
   pending: boolean;
   error: string;
@@ -37,7 +40,7 @@ export function JudgmentPanel({
   const disabled = busy || pending || expired;
   const submit = async (direction: Direction) => {
     if (disabled || submitting.current) return;
-    const clientEventId = crypto.randomUUID();
+    const clientEventId = createUuid();
     let body: JudgmentInput;
     try {
       body = validateJudgment({
@@ -160,37 +163,49 @@ export function JudgmentPanel({
           이전 요청 저장 결과 확인
         </button>
       )}
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          aria-pressed={item.latestDirection === "UP"}
-          className={
-            buttonClass +
-            " transition-colors " +
-            (item.latestDirection === "UP"
-              ? "!bg-red-700 !text-white !border-red-700 hover:!bg-red-800"
-              : "!bg-white !text-red-800 !border-red-700 hover:!bg-red-50")
-          }
-          disabled={disabled}
-          onClick={() => void submit("UP")}
-        >
-          ▲ 상승 판단
-        </button>
-        <button
-          type="button"
-          aria-pressed={item.latestDirection === "DOWN"}
-          className={
-            buttonClass +
-            " transition-colors " +
-            (item.latestDirection === "DOWN"
-              ? "!bg-blue-800 !text-white !border-blue-800 hover:!bg-blue-900"
-              : "!bg-white !text-blue-900 !border-blue-800 hover:!bg-blue-50")
-          }
-          disabled={disabled}
-          onClick={() => void submit("DOWN")}
-        >
-          ▼ 하락 판단
-        </button>
+      <div className="space-y-2">
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            aria-pressed={item.latestDirection === "UP"}
+            className={
+              buttonClass +
+              " transition-colors " +
+              (item.latestDirection === "UP"
+                ? "!bg-red-700 !text-white !border-red-700 hover:!bg-red-800"
+                : "!bg-white !text-red-800 !border-red-700 hover:!bg-red-50")
+            }
+            disabled={disabled}
+            onClick={() => void submit("UP")}
+          >
+            ▲ 상승 판단
+          </button>
+          <button
+            type="button"
+            aria-pressed={item.latestDirection === "DOWN"}
+            className={
+              buttonClass +
+              " transition-colors " +
+              (item.latestDirection === "DOWN"
+                ? "!bg-blue-800 !text-white !border-blue-800 hover:!bg-blue-900"
+                : "!bg-white !text-blue-900 !border-blue-800 hover:!bg-blue-50")
+            }
+            disabled={disabled}
+            onClick={() => void submit("DOWN")}
+          >
+            ▼ 하락 판단
+          </button>
+        </div>
+        <div className="flex flex-wrap justify-between gap-x-3 gap-y-1 text-xs">
+          <p>
+            현재까지 판단 <strong>{judgmentCount}회</strong>
+            {item.latestDirection &&
+              ` · 최근 ${item.latestDirection === "UP" ? "▲ 상승" : "▼ 하락"}`}
+          </p>
+          <p className="text-gray-600">
+            새 정보를 확인하고 판단을 추가할 수 있습니다.
+          </p>
+        </div>
       </div>
     </div>
   );

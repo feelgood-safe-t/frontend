@@ -160,12 +160,6 @@ export default function RootFlow() {
   const begin = async () => {
     if (await controller.begin()) navigate("/survey");
   };
-  const reset = () => {
-    controller.reset();
-    setRecords([]);
-    setLegacy([]);
-    navigate("/");
-  };
   const active = session?.status === "ACTIVE" || session?.status === "CREATED";
   const currentRecord: RecordSnapshot | undefined =
     session && isSessionEnded(session.status)
@@ -181,19 +175,7 @@ export default function RootFlow() {
         }
       : undefined;
   const landing = (
-    <AssessmentLayout
-      onHome={home}
-      mode={controller.mode}
-      actions={
-        <button
-          disabled={busy}
-          onClick={reset}
-          className="border border-white px-3 py-2 text-xs"
-        >
-          리셋
-        </button>
-      }
-    >
+    <AssessmentLayout onHome={home} mode={controller.mode}>
       <Panel title="투자 판단 연습">
         <h1 className="text-2xl sm:text-3xl font-black leading-snug">
           새로운 정보 앞에서,
@@ -443,9 +425,6 @@ export default function RootFlow() {
             onClick={() => void controller.sync()}
           >
             다시 확인
-          </button>
-          <button className={secondaryClass + " mt-4 ml-2"} onClick={reset}>
-            리셋
           </button>
         </Panel>
       </AssessmentLayout>

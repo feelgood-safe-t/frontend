@@ -523,16 +523,29 @@ export function createPocClient(
           text(error.code)
             ? error.code
             : "REQUEST_FAILED";
+        console.error("[청노][API_REQUEST] HTTP 오류", {
+          method: body === undefined ? "GET" : "POST",
+          path,
+          status: response.status,
+          code,
+        });
         throw new PocApiError(response.status, code);
       }
       ensure(value !== null);
       return value;
     } catch (error) {
       if (error instanceof PocApiError) throw error;
-      throw new PocApiError(
-        0,
-        controller.signal.aborted ? "REQUEST_TIMEOUT" : "NETWORK_ERROR",
-      );
+      const code = controller.signal.aborted
+        ? "REQUEST_TIMEOUT"
+        : "NETWORK_ERROR";
+      console.error("[청노][API_REQUEST] 네트워크 오류", {
+        method: body === undefined ? "GET" : "POST",
+        path,
+        status: 0,
+        code,
+        errorName: error instanceof Error ? error.name : typeof error,
+      });
+      throw new PocApiError(0, code);
     } finally {
       clearTimeout(timeout);
     }
