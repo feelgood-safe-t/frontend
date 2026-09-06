@@ -19,8 +19,10 @@ API 주소가 없으면 데모로 실행됩니다. 실제 연동은 `.env.develo
 VITE_SAFE_T_API_BASE_URL=http://47.129.245.75:8000
 ```
 
-위 주소는 HTTP 개발 API이므로 로컬 프론트에서 사용합니다. HTTPS로 제공되는
-GitHub Pages 배포본에 연결하려면 백엔드도 HTTPS 주소를 제공해야 합니다.
+프로덕션 빌드도 `.env.production`에 설정된 같은 공개 테스트 API를 사용합니다.
+S3 정적 웹사이트 엔드포인트를 HTTP로 열면 바로 연동할 수 있습니다. CloudFront
+등으로 프론트를 HTTPS로 제공할 때는 혼합 콘텐츠 차단을 피하도록 백엔드도
+HTTPS 주소를 사용해야 합니다.
 
 최신 백엔드 `0.7`의 API 세 개만 사용하며 로그인·참가자 헤더·서버 세션은 없습니다.
 
@@ -51,4 +53,14 @@ npm run test:integration
 
 실제 FastAPI·Snapshot 검증·점수 합산 규칙을 별도 임시 포트에서 실행하고, **테스트에서만** LLM 응답을 대체합니다. OpenAI 호출·DB 생성 없이 3문항 완주, 반복 판단·열람, 시간 만료·조기 종료, 최종 평가와 기록 보존을 검증합니다. 기존 개발 서버는 변경하지 않으며 테스트 서버는 종료 시 정리됩니다.
 
-GitHub Pages 경로는 `/frontend/`, 라우팅은 해시 방식입니다.
+## S3 정적 배포
+
+```bash
+npm run build
+aws s3 sync dist/ s3://버킷이름/ --delete
+```
+
+버킷 루트의 `index.html`을 시작 문서로 설정합니다. 빌드 자산은 `/assets/`를
+기준으로 생성되며 라우팅은 해시 방식이므로 별도의 SPA 경로 재작성은 필요하지
+않습니다. 실제 S3 도메인이 확정되면 `index.html`의 OG 이미지 경로를 절대
+URL로 바꾸는 것이 좋습니다.
